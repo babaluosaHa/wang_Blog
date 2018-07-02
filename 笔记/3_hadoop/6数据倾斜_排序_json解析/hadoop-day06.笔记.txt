@@ -1,0 +1,434 @@
+﻿
+MR本地运行模式提交
+--------------------
+
+
+
+切片的计算法则
+---------------
+	1.计算法则
+		minSplitSize
+		maxSPlitSize
+		blockSize
+		取中数。
+		
+	2.计算切片个数
+		物理计算
+	
+	3.执行map，逻辑执行。
+		TextInputFormat
+		SequenceFile
+		KeyValueText....
+
+
+自定义分区类
+---------------
+	0.MR分区类
+		reduce个数为1，设置分区类型无效，代码中使用固定的实现。
+		reduce个数大于1，有效。
+
+	1.hadoop的mr默认分区
+		HashPartitioner
+		(key.hashCode() & Integer.MAX_VALUE) % numReduceTasks;
+
+	2.自定义实现类
+		package com.it18zhang.hadoop.partitioner;
+
+		import org.apache.hadoop.io.IntWritable;
+		import org.apache.hadoop.io.Text;
+		import org.apache.hadoop.mapreduce.Partitioner;
+
+		/**
+		 * Created by Administrator on 2018/1/11.
+		 */
+		public class MyPartitioner extends Partitioner<Text,IntWritable> {
+
+			public int getPartition(Text text, IntWritable intWritable, int numPartitions) {
+				return 0;
+			}
+		}
+
+	3.配置job使用自定义分区(分区指map里边的分区)
+		job.setPartitionerClass(MyPartitioner.class);
+
+
+数据倾斜(结果集中在某些节点上)
+--------------
+	数据倾斜需要二次作业。避免不了，输入的是keyValueTextInputFormat
+
+	1.重新设计key
+		map端的输出key追加随机数(个数和reduce相同)
+
+	2.自定义分区类(这个好)
+		随机分区。
+
+
+排序
+----------------
+	0.mr的输出结果按照key排序，升序。
+
+	1.部分排序
+		nothing!(默认)	
+
+	2.全排序(所有文件连在一起后仍然有序)
+		2.1)一个reduce（简单粗暴，量大就废了）
+			
+		2.2)自定义分区(在对数据分布比较清楚的条件下使用)
+			//自定义分区切割线
+			public class YearPartitioner extends Partitioner<IntWritable,IntWritable> {
+				public int getPartition(IntWritable key, IntWritable value, int numPartitions) {
+					int year = key.get() ;
+					if(year <= 1930){
+						return 0  ;
+					}
+					else if(year >= 1960){
+						return 2 ;
+					}
+					return 1 ;
+				}
+			}
+
+			//job设置分区类
+			job.setPartitionerClass(YearPartitioner.class);
+
+		2.3)使用采样(对key的分布进行分析，确定切割线) 分区文件：序列文件
+			public static void main(String[] args) throws Exception {
+				args = new String[]{"file:///d:/mr/wc/1.txt", "file:///d:/mr/wc/out"};
+				if (args == null || args.length < 2) {
+					throw new Exception("参数不足,需要两个参数!");
+				}
+
+				Configuration conf = new Configuration();
+				conf.set("fs.defaultFS", "file:///");
+				FileSystem fs = FileSystem.get(conf);
+
+				//递归删除输出目录
+				fs.delete(new Path(args[1]), true);
+
+				//创建job
+				Job job = Job.getInstance(conf);
+				job.setJobName("wcApp");
+				job.setJarByClass(App.class);
+
+				FileInputFormat.addInputPath(job, new Path(args[0]));
+				FileOutputFormat.setOutputPath(job, new Path(args[1]));
+
+				job.setMapperClass(WCMapper.class);
+				job.setReducerClass(WCReducer.class);
+
+				//使用hadoop内置全排序分区类
+				job.setPartitionerClass(TotalOrderPartitioner.class);
+
+				job.setOutputKeyClass(Text.class);
+				job.setOutputValueClass(IntWritable.class);
+
+				//设置reduce个数
+				job.setNumReduceTasks(3);
+
+				//设置全排序分区文件位置
+				TotalOrderPartitioner.setPartitionFile(job.getConfiguration(), new Path("file:///d:/mr/temp/temp.par"));
+
+				//以下代码在job提交前编写。
+				//创建随机采样器
+				//0.5f	: 每个key选中的概率
+				//100 	: 采样出来的样本数
+				//3 	:采样最多的切片数
+				InputSampler.Sampler sample = new InputSampler.RandomSampler(0.5f ,100 ,  3) ;
+				//写分区文件
+				InputSampler.writePartitionFile(job , sample) ;
+				//开始作业
+				job.waitForCompletion(true);
+			}
+
+			注意事项 ： 采样实现全排序，Map的输入key和输出key类型相同。通常对序列文件实现采样方式全排序.
+		
+	3.二次排序
+		对value也进行排序。
+		将value也设计到key中。
+		3.1)设计组合key
+			package com.it18zhang.hadoop.mr.sort.secondarysort;
+
+			import org.apache.hadoop.io.WritableComparable;	// 既能串行化，也能够比较大小。
+
+			import java.io.DataInput;
+			import java.io.DataOutput;
+			import java.io.IOException;
+
+			/**
+			 * 自定义组合key
+			 */
+			public class ComboKey implements WritableComparable<ComboKey> {
+				private int year ;
+				private int temp ;
+
+				public ComboKey(){
+
+				}
+				public ComboKey(int year , int temp){
+					this.year = year ;
+					this.temp = temp ;
+				}
+
+				public int getYear() {
+					return year;
+				}
+
+				public void setYear(int year) {
+					this.year = year;
+				}
+
+				public int getTemp() {
+					return temp;
+				}
+
+				public void setTemp(int temp) {
+					this.temp = temp;
+				}
+
+				public int compareTo(ComboKey o) {
+					int oyear = o.getYear() ;
+					int otemp = o.getTemp() ;
+					//年份升序排序
+					if(year != oyear){
+						return year - oyear ;
+					}
+					else{
+						//年份相同，气温降序
+						return -(temp - otemp) ;
+					}
+				}
+
+				public void write(DataOutput out) throws IOException {
+					out.writeInt(year);
+					out.writeInt(temp);
+
+				}
+
+				public void readFields(DataInput in) throws IOException {
+					this.year = in.readInt();
+					this.temp = in.readInt() ;
+
+				}
+			}
+
+		3.2)自定义分区
+			package com.it18zhang.hadoop.mr.sort.secondarysort;
+
+			import org.apache.hadoop.io.NullWritable;
+			import org.apache.hadoop.mapreduce.Partitioner;
+
+			/**
+			 * Created by Administrator on 2018/1/11.
+			 */
+			public class YearPartitioner extends Partitioner<ComboKey,NullWritable> {
+				public int getPartition(ComboKey key, NullWritable value, int numPartitions) {
+					return key.getYear() % numPartitions;
+				}
+			}
+		
+		3.3)实现Mapper
+			package com.it18zhang.hadoop.mr.sort.secondarysort;
+
+			import org.apache.hadoop.io.IntWritable;
+			import org.apache.hadoop.io.NullWritable;
+			import org.apache.hadoop.mapreduce.Mapper;
+
+			import java.io.IOException;
+
+			/**
+			 */
+			public class MaxTempMapper extends Mapper<IntWritable,IntWritable,ComboKey,NullWritable> {
+				protected void map(IntWritable key, IntWritable value, Context context) throws IOException, InterruptedException {
+					ComboKey outKey = new ComboKey();
+					outKey.setYear(key.get());
+					outKey.setTemp(value.get());
+					context.write(outKey,NullWritable.get());
+				}
+			}
+		
+		3.4)设计分组对比器
+			package com.it18zhang.hadoop.mr.sort.secondarysort;
+
+			import org.apache.hadoop.io.WritableComparable;
+			import org.apache.hadoop.io.WritableComparator;
+
+			/**
+			 * 自定义分组对比器
+			 * 比较年份
+			 */
+			public class ComboKeyGroupComparator extends WritableComparator {
+
+				public ComboKeyGroupComparator(){
+					super(ComboKey.class,true) ;	// 注意事项，相当于注册
+				}
+
+				public int compare(WritableComparable a, WritableComparable b) {
+					ComboKey k1 = (ComboKey)a ;
+					ComboKey k2 = (ComboKey)b ;
+					return k1.getYear() - k2.getYear() ;
+				}
+			}
+
+		3.5)设计reduce端的排序对比器
+			//决定的是reduce端的key排序。
+			package com.it18zhang.hadoop.mr.sort.secondarysort;
+
+			import org.apache.hadoop.io.WritableComparable;
+			import org.apache.hadoop.io.WritableComparator;
+
+			/**
+			 * 排序对比器
+			 */
+			public class ComboKeySortComparator extends WritableComparator {
+				public ComboKeySortComparator() {
+					super(ComboKey.class, true);
+				}
+
+				public int compare(WritableComparable a, WritableComparable b) {
+					ComboKey k1 = (ComboKey) a;
+					ComboKey k2 = (ComboKey) b;
+					return k1.compareTo(k2) ;
+				}
+			}
+		
+		3.6)实现Reducer	// 调用的是组
+			package com.it18zhang.hadoop.mr.sort.secondarysort;
+
+			import org.apache.hadoop.io.IntWritable;
+			import org.apache.hadoop.io.NullWritable;
+			import org.apache.hadoop.mapreduce.Reducer;
+
+			import java.io.IOException;
+
+			/**
+			 *
+			 */
+			public class MaxTempReducer extends Reducer<ComboKey,NullWritable,IntWritable,IntWritable> {
+				protected void reduce(ComboKey key, Iterable<NullWritable> values, Context context) throws IOException, InterruptedException {
+					int year = key.getYear();
+					int temp = key.getTemp() ;
+					context.write(new IntWritable(year) , new IntWritable(temp));
+				}
+			}
+		
+		3.7)实现App	
+			package com.it18zhang.hadoop.mr.sort.secondarysort;
+
+			import com.it18zhang.hadoop.mr.Appp;
+			import com.it18zhang.hadoop.mr.skew.key.WordCountSkewKeyMapper;
+			import com.it18zhang.hadoop.mr.skew.key.WordCountSkewKeyReducer;
+			import org.apache.hadoop.conf.Configuration;
+			import org.apache.hadoop.fs.FileSystem;
+			import org.apache.hadoop.fs.Path;
+			import org.apache.hadoop.io.IntWritable;
+			import org.apache.hadoop.io.NullWritable;
+			import org.apache.hadoop.io.SequenceFile;
+			import org.apache.hadoop.io.Text;
+			import org.apache.hadoop.mapreduce.Job;
+			import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
+			import org.apache.hadoop.mapreduce.lib.input.SequenceFileInputFormat;
+			import org.apache.hadoop.mapreduce.lib.input.TextInputFormat;
+			import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
+			import org.apache.hadoop.mapreduce.lib.output.TextOutputFormat;
+
+			/**
+			 * Created by Administrator on 2018/1/11.
+			 */
+			public class App {
+				public static void main(String[] args) throws Exception {
+					args = new String[]{"file:///d:/mr/temp.seq", "file:///d:/mr/temp/out"};
+					if (args == null || args.length < 2) {
+						throw new Exception("参数不足,需要两个参数!");
+					}
+
+					Configuration conf = new Configuration();
+					conf.set("fs.defaultFS", "file:///");
+					FileSystem fs = FileSystem.get(conf);
+
+					//递归删除输出目录
+					fs.delete(new Path(args[1]), true);
+
+					//创建job
+					Job job = Job.getInstance(conf);
+					job.setJobName("2sort App");
+					job.setJarByClass(App.class);
+
+					job.setInputFormatClass(SequenceFileInputFormat.class);
+					job.setOutputFormatClass(TextOutputFormat.class);
+
+					FileInputFormat.addInputPath(job, new Path(args[0]));
+					FileOutputFormat.setOutputPath(job, new Path(args[1]));
+
+					job.setMapperClass(MaxTempMapper.class);
+					job.setReducerClass(MaxTempReducer.class);
+
+					job.setMapOutputKeyClass(ComboKey.class);
+					job.setMapOutputValueClass(NullWritable.class);
+
+					//二次排序
+					job.setPartitionerClass(YearPartitioner.class);					//自定分区类
+					job.setGroupingComparatorClass(ComboKeyGroupComparator.class);	//分组对比器
+					job.setSortComparatorClass(ComboKeySortComparator.class);		//排序对比器
+
+					job.setOutputKeyClass(IntWritable.class);
+					job.setOutputValueClass(IntWritable.class);
+
+					job.setNumReduceTasks(3);
+
+					job.waitForCompletion(true) ;
+				}
+			}
+
+xml
+-----------------
+	extensible markup language,可扩展标记语言。
+	结构清晰，严谨。
+
+json
+-----------------
+	text，
+	{"reviewPics":null,"extInfoList":null,"expenseList":null,"review...}
+
+
+使用fastjson库解析json文件
+---------------------------
+	1.引入fastjson maven依赖
+        <dependency>
+            <groupId>com.alibaba</groupId>
+            <artifactId>fastjson</artifactId>
+            <version>1.2.24</version>
+        </dependency>
+	2.测试类
+		package com.it18zhang.hadoop.test;
+
+		import com.alibaba.fastjson.JSON;
+		import com.alibaba.fastjson.JSONArray;
+		import com.alibaba.fastjson.JSONObject;
+		import org.junit.Test;
+
+		/**
+		 * Created by Administrator on 2018/1/11.
+		 */
+		public class TestJson {
+			@Test
+			public void testRead(){
+				//解析json文本成JSONObject
+				JSONObject jo = JSON.parseObject("{\"reviewPics\":null,\"extInfoList\":[{\"title\":\"contentTags\",\"values\":[\"环境优雅\",\"性价比高\",\"干净卫生\",\"停车方便\",\"音响效果好\"],\"desc\":\"\",\"defineType\":0},{\"title\":\"tagIds\",\"values\":[\"24\",\"300\",\"852\",\"506\",\"173\"],\"desc\":\"\",\"defineType\":0}],\"expenseList\":null,\"reviewIndexes\":[2],\"scoreList\":null}") ;
+				if(jo != null){
+					JSONArray arr = jo.getJSONArray("extInfoList");
+					if(arr != null && arr.size() > 0){
+						JSONObject o1 = arr.getJSONObject(0) ;
+						if(o1 != null){
+							JSONArray arr2 = o1.getJSONArray("values") ;
+							if(arr2 != null && arr2.size() > 0){
+								for(int i = 0 ; i < arr2.size() ; i ++){
+									String tag = arr2.getString(i);
+									System.out.println(tag);
+								}
+							}
+						}
+					}
+				}
+
+			}
+		}

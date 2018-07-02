@@ -1,0 +1,13 @@
+﻿1.TreeSet通过CompareTo和compare判断对象的大小和唯一性
+2.Map存储元素使用put方法，Collection使用add方法
+3.HashTable 线程安全
+4.集合工具类(collections和arrays)
+	collections
+----------------------------
+	binarySearch()-checkedList()-emptyList()-copy()
+5.widows下路径用“/”或“\\”
+
+作业
+---------------
+1.实现文件的复制
+	

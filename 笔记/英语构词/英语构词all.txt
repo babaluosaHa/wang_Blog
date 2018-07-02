@@ -1,0 +1,198 @@
+前缀(85个)
+与位置、反义及运动有关
+14个关键前缀
+-----------------------------
+pre-				在...前面		prefix
+de-				离开，向下的		devalue 向下	detrain 离开，下火车
+inter-				在...之间，在...之中	internet
+ob-				反对			obstruct vt 阻碍，阻塞
+mono-				孤独的，一个		monopoly	垄断
+epi-				在...之上		epidemic n 流行病 demic 人体
+ad-				向，朝着		advice vice副 朝着副总统寻求建议
+un-				否定，不
+com-				共同地，与		common
+non-				不在外地（在外面），超过
+ex-							express
+pro-				向前的，对于		progress 进步
+in-				不，否定
+dis-				分开地，不		disorder  紊乱
+sub-				在...之下		subway    n 地铁
+trans-				横过，超过		transport
+-----------------------------
+a-,an-				没有			asocial adj 不合群
+ab-,abs-			分开，远离		absent 缺席
+ad-				向...
+aero-				空气			aeroplane 飞机
+amb-,ambi-			都，周围
+amphi-				都，环绕
+ante-				之前
+anti-				对抗，反对
+apo-				远离			apology
+arch-				主要的，最重要的
+be-				附近，使...
+bene-				好
+bi-				两个			bicycle
+by-,bye-			加上
+cata-				向下
+centi-,cente-			成百的
+circum-				周围
+co-,col-,com-，cor-,con-	一起，和
+contra-				反对
+de-				向下
+deca-,deci-			十			decade 十年
+demi-				一半
+dia-				通过，在...间
+dis-				不，与...相反
+duo-				两个
+dys-				坏的，困难的
+e-,ex-				在...之外		express
+ec-				在什么之外		eclipse
+en-,in-,em-,im-			到...里，不
+epi-				在...上，在...方面
+equi-				平等地			equall
+for,fore-			之前			foresee v 预见
+hemi-				一半
+hepta-				七
+hexa-				六
+homo-				一样
+hyper-				在...上，超过
+il-				不			illegal
+in-,im-,(un-)			不
+inter-				在...中，在...之间	international 
+intra-,intro-			在...里			introduction
+iso-				相等的，一样的		isobar 等压线
+mis-				错误地
+mono-				单一的
+multi-				许多的
+non-				不
+ob-,op-				关于...方面，反抗       oppose
+octa-,octo-			八
+off-				离开			offset
+out-				超出			outstanding
+para-				在...旁边，超出
+penta-				五
+per-				通过			permit 允许
+peri-				周围，附近
+post-				之后			postdoctor 博士后
+prime-,primo-			第一，重要的
+pro-				在...前面，喜欢的
+quadri-				四
+retro-				向后
+semi-				一半
+sub-				在...之下
+super-				在...之上
+syl-				和...一起
+syn-,sym-			一起
+tele-				远的，有一定距离的
+ter-				三倍
+tetra-				四
+tri-				三			triangle 三角形
+ultra-				超过
+un-(im-)			不
+uni-				一			unique 独特
+vice-				代替
+
+词根(49个)
+---------------------
+-ic				与...有关		historic adj 历史性
+am(出自amare)			爱
+ann(出自annus)			年			anniversary n 周年
+aud(出自audire)			听			audio  n 音响
+bio				生命
+cap(出自capire)			取			capture
+cap(出自caput)			头			capital 首都
+chron				时间
+cor				心脏			cordial adj 诚恳的
+corp				身体
+de				神			deity
+dic,dict			说，讲			dictate v 口述，命令
+duc(出自ducere)			领导
+ego				我			egotism
+equi				平等				
+fac,fic(出自facere)		制造，做		factory
+frat(出自frater)		兄弟
+geo				地球
+graph				写
+loc(出自locus)			位置
+loqu,loc(出自loqui)		说			eloquence 口才
+luc(出自lux)			光线
+man(出自mannus)			手			manual n 手册
+mit,miss(出自mittere)		送
+mort(出自mors)			死
+omni				全部			omnibus 公共汽车
+pat(出自pater)			父亲
+path				遭遇，感觉
+ped(出自pes)			脚
+phobia,phobe			惧怕
+photo				光线
+pneum				空气，呼吸，精神
+pos,posit			位置
+pot,poss,poten(出自ponere)	能...			
+rog(出自rogare)			询问
+scrib,scrip(出自scriptbere)	写			describe 描述
+sent,sens(出自sentire)		感觉
+sol				单独地			solo 独奏
+soph				聪明
+spect(出自spicere)		看			inspect 检查
+spir(出自spirare)		呼吸
+ten(出自tendere)		伸展
+ten(出自tenere)			保持
+therm(出自thermos)		温暖
+utilis				有用的
+ven,vent(出自venire)		来，到达		convenient
+vert,vers(出自vertere)		转			convert
+vid,vis(出自videre)		看见			supervisor n 监督者
+
+后缀(51个)
+其中许多与特征或性质有关，或者用于改变单词的词性（例如形容词变成副词）
+--------------------------
+-able,-ible			能够，适合于
+-acy				状态，性质		accuracy n 准确的
+-age				行为，状态
+-al,-ial			与...有关
+-an(-ane,-ian)			具有...的性质		African adj 非洲的
+-ance,-ence			品性，行为
+-ant				形成表示某种特性的形容词，
+				或者表示私人机构或产生某种影响的事务的名词	servant 仆人
+-arium,-orium			场所、地点		auditorum 听众席
+-ary				场所、地点，与...有关	dictionary
+-atable				(见-able,-ible)
+-ate				使之成...，官员		animate v 使有生气
+-ation,-ition			行动，状态
+-cle,icle			极小的
+-dom				条件或控制
+-en				小
+-en				品质			golden，broken			
+-er				属于...的
+-et，-ette			小
+-ferous				产出...的
+-ful				充满			
+-fy,-ify			使之变成...		satisfy	
+-hood				表示状态或条件
+-ia				种类或地点的名称
+-ian				某种职业的人或某地居民	musician
+-ic				与...有关		historic adj 历史性
+-id				某种性质
+-ine				某种成分
+-ion				条件或行为
+-ish				类似或关系		childish 孩子气的
+-ism				某种特性或主义		egotism
+-ist				经常做某事的人
+-itis				发炎(医)
+-ity,-ety,-ty			状态或性质
+-ive				性质			creative
+-ize,-ise			做，实践，照...样子做	advertise
+-less				缺乏
+-logy				表示知识的分支
+-ly				具有某种特征
+-ment				行为或条件
+-metry,-meter			测量
+-mony				结果的条件
+-oid				类似
+-or				表示处于某种状态的人或物victor
+-osis				过程或条件
+-ous,-ose			充满			cautious 谨慎的
+-some				像
+-tude				质量或程度
+-ward				方向
+-y				条件

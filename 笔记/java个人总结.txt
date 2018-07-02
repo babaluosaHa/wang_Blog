@@ -1,0 +1,42 @@
+﻿1.数组
+  数组长度 ary.length
+  数组拷贝 System.arraycopy(src,startPos,dest,startPos,count)
+  数组排序 Arrays.sort(ary) // quickSort
+  判断数组有效性 arr!=null && arr.length>0
+2.面向接口编程
+	list<list<Integer>> list;
+	list=new Arraylist<list<Integer>>();
+	list.add(Arrays.aslist(nums[left],nums[mid],nums[right]))
+
+3.字符串和字节之间的转换
+	a)字符串转字节数组
+		String str="a中b";
+		//编码
+		byte[] bytes=str.getBytes("GBK");
+	b)字节数组转字符串
+		byte[] big5={-92,92};
+		System.out.println(new String(big5,"big5"));
+	c)字符串切割
+		str.split("@")[0];
+4.容器
+	a)List
+		①Arraylist
+		②Linkedlist
+	b)Set
+		元素不能重复，没有get()，只能通过迭代器实现
+		①HashSet
+        c)Map
+		map集合没有直接取出元素的方法，需要先转成set集合，再通过迭代获取元素。
+		①HashMap
+
+5.输入输出
+------------------------------
+	a)字符流
+	b)字节流
+		FileInputStream FileOutputStream 最常用
+	c)RandomAceessFile
+		随机访问文件，定位到文件的任意位置。
+
+6.系统时间
+------------------------------
+	long l=System.currentTimeMillis();

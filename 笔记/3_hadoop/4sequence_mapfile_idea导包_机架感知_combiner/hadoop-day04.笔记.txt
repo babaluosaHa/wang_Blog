@@ -1,0 +1,569 @@
+﻿压缩
+-----------
+	deflate
+	gz
+	bzip2
+	lzo
+	lz4
+	snappy
+
+	lz4 < lzo < ... < bzip2（时间效率）
+	bzip2 < ... <  lzo < lz4（空间效率）
+
+sequenceFile
+---------------
+	key-value
+	同步点。
+	可以切割.
+	Writer
+	Reader
+
+	1.压缩方式（压缩的数据量越大，压缩的效果越好）
+		a.No
+			 不压缩
+			 Record结构: Rec Len , Key len , Key , value
+
+		b.Record compression
+			按照记录压缩。
+			record结构 : rec len , key len , key , compressed value.
+
+		3.block compression（效果最好）
+			块压缩。
+			block = 两个同步点之间的所有record构成。
+			block结构 ：记录个数 ， 压缩的key长度，压缩的key，压缩值长度，压缩的值。
+		
+		4.不同压缩方式的空间大小:
+			NONE			//196K
+			Record			//594K
+			Block			//11K
+
+
+MapFile（可用于快速检索）
+---------------
+	类似于SequenceFile，keyvalue类型，key必须是有序的，写入时必须有序。
+	产生index和data文件，另外两个crc文件是校验用的，不用管index对所有key的按照区间段进行划分，从key到
+	data文件中该key对应的posistion的映射。
+	cmd >hdfs dfs -text file:///d:/mr/mapfile/index	//查看序列文件
+
+@Test
+	public void testWrite() throws Exception {
+		Configuration conf = new Configuration();
+		conf.set("fs.defaultFS", "file:///");
+
+		FileSystem fs = FileSystem.get(conf);
+		String dir = "d:/mr/mapfile";
+		MapFile.Writer w = new MapFile.Writer(conf, fs, dir, IntWritable.class, Text.class);
+		IntWritable key = new IntWritable() ;
+		Text value = new Text() ;
+		for(int i = 0 ; i < 10000 ; i ++){
+			key.set(i) ;
+			value.set("tom" + i);
+			w.append(key,value);
+		}
+		key.set(10000);
+		value.set("tom");
+		w.append(key, value);
+		w.close();
+	}
+
+	@Test
+	public void testRead() throws Exception {
+		Configuration conf = new Configuration();
+		conf.set("fs.defaultFS", "file:///");
+
+		FileSystem fs = FileSystem.get(conf);
+		String dir = "d:/mr/mapfile";
+		MapFile.Reader reader = new MapFile.Reader(fs , dir , conf) ;
+		IntWritable key = new IntWritable();
+		Text value = new Text();
+		while(reader.next(key,value)){
+			System.out.println(key.get() + " : " + value.toString());
+		}
+		reader.close();
+	}
+
+	@Test
+	public void testFind() throws Exception {
+		Configuration conf = new Configuration();
+		conf.set("fs.defaultFS", "file:///");
+
+		FileSystem fs = FileSystem.get(conf);
+		String dir = "d:/mr/mapfile";
+		Path p = new Path("file:///d:/mr/mapfile/data") ;
+		SequenceFile.Reader reader = new SequenceFile.Reader(fs,p,conf) ;
+		reader.seek(172720);
+		IntWritable key = new IntWritable();
+		Text value = new Text();
+		reader.next(key,value) ;
+		System.out.println(key.get() + " : " + value.toString());
+	}
+
+slaves
+----------------
+	
+
+
+新节点服役（不用把集群停掉）
+----------------
+	0.克隆新机，软件安装与配置。
+		主机名
+		静态ip
+		ssh
+		软件（rsnc、hadoop、putty）
+		环境变量
+	
+	0'.黑白名单说明
+		黑白名单只出现在nn节点。
+
+		[hdfs-site.xml]
+		<!-- 白名单 -->
+		<property>
+			<name>dfs.hosts</name>	// 白名单属性
+			<value></value>
+			<description>
+				包含允许连接NN的主机名列表，必须是绝对路径，如果为空，所有主机都可以连接。
+				Names a file that contains a list of hosts that are
+				permitted to connect to the namenode. The full pathname of the file
+				must be specified.  If the value is empty, all hosts are
+				permitted.
+			</description>
+		</property>
+		
+		<!-- 黑名单 -->
+		<property>
+			<name>dfs.hosts.exclude</name>
+			<value></value>
+			<description>
+				文件，包含主机名列表，列表中的主机都不能连接NN.
+				空表示没有主机在黑名单中。
+				Names a file that contains a list of hosts that are
+				not permitted to connect to the namenode.  The full pathname of the
+				file must be specified.  If the value is empty, no hosts are
+				excluded.
+			</description>
+		</property> 
+
+	1.添加新主机到白名单。
+		[/soft/hadoop/etc/hadoop/dfs_include.conf]
+		s102
+		s103
+		s104
+		s106
+
+		[hdfs-site.xm]
+		<property>
+			<name>dfs.hosts</name>
+			<value>/soft/hadoop/etc/hadoop/dfs_include.conf</value>
+		</property>
+
+	2.刷新名称节点
+		$>hdfs dfsadmin -refreshNodes	// 刷新配置
+
+	3.刷新yarn节点
+		yarn rmadmin -refreshNodes
+
+	4.更新slaves文件，不用分发
+		s102
+		s103
+		s104
+		s106
+
+	5.启动新节点的datanode进程和nodemanager进程
+		//登录s106
+		$>hadoop-daemon.sh start datanode			//启动datanode进程
+		$>yarn-daemon.sh start nodemanager			//启动nodemanager进程
+
+	6.检查webui即可。
+
+
+原有节点退役
+----------------
+	1.添加下线节点主机名到黑名单，不更新白名单。
+		[/soft/hadoop/etc/hadoop/dfs_exclude.conf]
+		s104
+
+		[hdfs-site.xml]
+		<property>
+			<name>dfs.hosts.exclude</name>
+			<value>/soft/hadoop/etc/hadoop/dfs_exclude.conf</value>
+		</property>
+
+	2.刷新名称节点
+		$>hdfs dfsadmin -refreshNodes
+
+	3.刷新yarn
+		$>yarn rmadmin -refreshNodes
+
+	4.webui查看状态是否是下线中.开始复制block到其他节点。
+		
+	5.当所有数据节点报告已退役，说明所有block复制完成。下线节点。
+		
+	6.从白名单删除节点，并运行刷新节点
+		$>hdfs dfsadmin -refreshNodes
+		$>yarn rmadmin -refreshNodes
+
+	7.删除slave文件的节点。
+
+
+黑白名单组合影响
+------------------
+	没有配置的白名单，都可以连。
+	没有配置的黑名单，都可以连。
+
+	黑白名单组合控制主机是否可以连接到NN。
+	-----------------------------------------
+	include exclude 是否可连
+	-----------------------------------------
+	no		no		不能连
+	no		yes		不能连
+	yes		no		能连
+	yes		yes		可连但退役.
+
+yarn下nodemanager的黑白名单
+-----------------------------
+	[yarn-site.xml]
+	<!-- 白名单 -->
+	<property>
+		<description>Path to file with nodes to include.</description>
+		<name>yarn.resourcemanager.nodes.include-path</name>
+		<value></value>
+	</property>
+
+	<!-- 黑名单 -->
+	<property>
+		<description>Path to file with nodes to exclude.</description>
+		<name>yarn.resourcemanager.nodes.exclude-path</name>
+		<value></value>
+	</property>
+
+	//刷新命令
+	$>yarn rmadmin -refreshNodes
+
+
+机架感知（运维，设计网络拓扑，不作为重点）
+------------------
+	网络拓扑距离计算方式，是两台主机到达共同交换机的跃点数的和。
+	三个副本，存放副本主机的策略，跟网络距离有关。
+	hadoop默认所有主机在同一机架下。
+	RackAware,机架感知的。
+
+	三个副本 ： 
+	1.在本地（从数据节点上传）或者随机寻找（不在数据节点上传）一个节点存放第一个副本。
+	2.在同一机架的不同主机上存放第二个副本。
+	3.在不同机架上的不同主机存放第三个副本。
+
+	1.实现机架感知接口
+		package com.it18zhang.hadoop.rackaware;
+
+		import org.apache.hadoop.net.DNSToSwitchMapping;
+
+		import java.io.FileOutputStream;
+		import java.util.ArrayList;
+		import java.util.List;
+
+		/**
+		 * 自定义机架感知
+		 */
+		public class MyDNSToSwitchMapping implements DNSToSwitchMapping {
+
+			public List<String> resolve(List<String> names) {	//resolve,解析
+
+				List<String> list = new ArrayList<String>() ;
+				for(String name : names){
+					//主机名
+					if(name.startsWith("s")){
+						int ip = Integer.parseInt(name.substring(1)) ;	// 从第2个字符开始取
+						if(ip < 104){
+							list.add("/a/" + name) ;
+						}
+						else{
+							list.add("/b/" + name);
+						}
+					}
+					else if(name.contains(".")){
+						String[] arr = name.split("\\.") ;	// 正则中一个单独的点表示任意字符
+						//取出最后ip
+						int ip = Integer.parseInt(arr[arr.length - 1]) ;
+						if (ip < 104) {
+							list.add("/a/" + ip);
+						} else {
+							list.add("/b/" + ip);
+						}
+					}
+				}
+				return list;
+			}
+
+			public void reloadCachedMappings() {
+			}
+
+			public void reloadCachedMappings(List<String> names) {
+			}
+
+			private void writeToLog(List<String> names){
+				try {
+					// true,追加模式
+					FileOutputStream fos = new FileOutputStream("/home/centos/rack.log", true) ;
+					fos.write("=================".getBytes());
+					fos.write("\r\n".getBytes());
+					for(String name : names){
+						fos.write(name.getBytes());
+						fos.write("\r\n".getBytes());
+					}
+					fos.close();
+				} catch (Exception e) {
+					e.printStackTrace();
+				}
+			}
+		}
+
+	2.配置机架感知的属性
+		<property>
+			<name>net.topology.node.switch.mapping.impl</name>
+			<value>com.it18zhang.hadoop.rackaware.MyDNSToSwitchMapping</value>
+		</property>
+
+	3.导出jar包，部署jar到hadoop的类路径下。
+		cp my-hadoop.jar /soft/hadoop/shared/hadoop/common/lib
+
+	4.重启集群
+		$>stop-all.sh
+
+	5.寻找一个DN节点，上传文件。
+		$>hdfs dfs -put 1.txt /user/centos/6.txt
+	
+	6.观察block的副本位置。
+		
+MapReduce
+--------------
+	$echo > rack.log 将文件窜空
+	高度抽象的编程模型。
+	Map,映射，分区个数与reduce个数相同。
+	reduce，化简聚合，个数由API编程决定。
+	map的输出是reduce的输入。相同的key聚到同一个reduce
+
+
+通过Mapreduce实现wordcount
+-------------------------
+	1.实现Mapper
+		package com.it18zhang.hadoop.mr;
+
+		import org.apache.hadoop.io.IntWritable;
+		import org.apache.hadoop.io.LongWritable;
+		import org.apache.hadoop.io.Text;
+		import org.apache.hadoop.mapreduce.Mapper;
+
+		import java.io.IOException;
+
+		/**
+		 * Mapper
+		 */
+		public class WordCountMapper extends Mapper<LongWritable, Text, Text, IntWritable> {
+			/**
+			 * key : 行首偏移量，字节数，意义不大。
+			 * value ： 一行文本
+			 */
+			protected void map(LongWritable key, Text value, Context context) throws IOException, InterruptedException {
+				//
+				String line = value.toString() ;
+				String[] arr = line.split(" ");
+
+				Text keyOut = new Text() ;
+				IntWritable valueOut = new IntWritable(1) ;
+				for(String word : arr){
+					keyOut.set(word);
+					context.write(keyOut,valueOut);
+				}
+			}
+		}
+
+	2.实现reducer
+		package com.it18zhang.hadoop.mr;
+
+		import org.apache.hadoop.io.IntWritable;
+		import org.apache.hadoop.io.Text;
+		import org.apache.hadoop.mapreduce.Reducer;
+
+		import java.io.IOException;
+
+		/**
+		 * reducer
+		 */
+		public class WordCountReducer extends Reducer<Text, IntWritable, Text, IntWritable> {
+			/**
+			 * key : word
+			 * values : 该key下聚合的value
+			 */
+			protected void reduce(Text key, Iterable<IntWritable> values, Context context) throws IOException, InterruptedException {
+				int count = 0 ;
+				for(IntWritable iw : values){
+					count = count + iw.get() ;
+				}
+				context.write(key , new IntWritable(count));
+			}
+		}
+
+	3.创建App
+		package com.it18zhang.hadoop.mr;
+
+		import org.apache.hadoop.conf.Configuration;
+		import org.apache.hadoop.fs.Path;
+		import org.apache.hadoop.io.IntWritable;
+		import org.apache.hadoop.io.Text;
+		import org.apache.hadoop.mapreduce.Job;
+		import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
+		import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
+
+		import java.io.IOException;
+
+		/**
+		 */
+		public class App {
+			public static void main(String[] args) throws Exception {
+
+				Configuration conf = new Configuration() ;
+
+				//创建job
+				Job job = Job.getInstance(conf)	;
+				job.setJobName("word_count_app");
+				job.setJarByClass(App.class);
+
+
+				//添加输入路径
+				FileInputFormat.addInputPath(job,new Path("file:///d:/mr/wc"));
+				//设置输出路径
+				FileOutputFormat.setOutputPath(job , new Path("file:///d:/mr/wc/out")); // 不能提前存在
+
+				//设置mapper类和reducer类
+				job.setMapperClass(WordCountMapper.class);
+				job.setReducerClass(WordCountReducer.class);
+
+				//设置输出的kv类型
+				job.setOutputKeyClass(Text.class);
+				job.setOutputValueClass(IntWritable.class);
+
+				//设置reduce个数
+				job.setNumReduceTasks(1);
+
+				//开始作业
+				job.waitForCompletion(true) ; // 控制台打印详细信息
+			}
+		}
+	
+	4.直接运行
+	
+	5.查看结果
+		
+在集群上运行job
+-------------------
+	1.改造代码
+		处理参数问题和输出路径问题。
+		package com.it18zhang.hadoop.mr;
+
+		import org.apache.hadoop.conf.Configuration;
+		import org.apache.hadoop.fs.FileSystem;
+		import org.apache.hadoop.fs.Path;
+		import org.apache.hadoop.io.IntWritable;
+		import org.apache.hadoop.io.Text;
+		import org.apache.hadoop.mapreduce.Job;
+		import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
+		import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
+
+		import java.io.IOException;
+
+		/**
+		 */
+		public class App {
+			public static void main(String[] args) throws Exception {
+
+				if(args == null || args.length < 2){
+					throw new Exception("参数不足,需要两个参数!") ;
+				}
+
+				Configuration conf = new Configuration() ;
+				FileSystem fs = FileSystem.get(conf) ;
+
+				//递归删除输出目录
+				fs.delete(new Path(args[1]),true) ;
+
+				//创建job
+				Job job = Job.getInstance(conf)	;
+				job.setJobName("word_count_app");
+				job.setJarByClass(App.class);
+
+
+				//添加输入路径
+				FileInputFormat.addInputPath(job,new Path(args[0]));
+				//设置输出路径
+				FileOutputFormat.setOutputPath(job , new Path(args[1]));
+
+				//设置mapper类和reducer类
+				job.setMapperClass(WordCountMapper.class);
+				job.setReducerClass(WordCountReducer.class);
+
+				//设置输出的kv类型
+				job.setOutputKeyClass(Text.class);
+				job.setOutputValueClass(IntWritable.class);
+
+				//设置reduce个数
+				job.setNumReduceTasks(1);
+
+				//开始作业
+				job.waitForCompletion(true) ;
+			}
+		}
+
+	2.导出jar包,复制到centos下。
+		
+	3.启动yarn集群
+		$>start-yarn.sh
+
+	4.通过hadoop jar运行job
+		$>hadoop jar my-hadoop.jar com.it18zhang.hadoop.mr.App  hdfs://s101:8020/user/centos/1.txt hdfs://s101:8020/user/centos/out
+
+	5.同步系统时间(所有主机都需要安装)
+		5.1)先安装ntpdate命令
+			$>su root
+			$>xcall.sh "yum install -y ntpdate"
+
+		5.2)同步时间
+			$>su root
+			$>xcall.sh "ntpdate ntp.aliyun.com"
+
+NN故障恢复(保证可靠性，但不能保证高可用性)
+----------------
+	1.停止NN进程
+		查看jps,kill -9 xxxxxx
+		
+	2.重命名~/hadoop
+		$>mv ~/hadoop ~/hadoop.bak
+
+	3.在~下创建相应目录
+		$>mkdir -p /home/centos/hadoop/full/dfs/current/name1
+		$>mkdir -p /home/centos/hadoop/full/dfs/current/name2
+
+	4.复制2nn的数据到/home/centos/hadoop/full/dfs/current/name1下
+		scp -r ./full/dfs/namesecondary/current/* centos@s101:/	
+	
+	5.注意事项
+		复制数据需要放到相应的目录下。
+		/home/centos/hadoop/full/dfs/name1/current/
+		/home/centos/hadoop/full/dfs/name2/current/
+
+
+Combiner
+----------------
+	MR的合成器，本质上就是reduce，在map端执行，
+	称之为map端reduce，或者预聚合。
+
+
+作业
+---------------
+	1.引入combiner
+		
+	2.使用mr计算每年气温的max，min，平均值。
+		1901	48,-50,23.25
+		1902	48,-50,23.25
+		1903	48,-50,23.25
+		1904	48,-50,23.25
+		1905    48,-50,23.25

@@ -1,0 +1,85 @@
+﻿异常
+------------------
+	Exception
+	java.lang.NullPointerException
+	..ArrayIndexOutOfBoundsException
+	ClassCastException
+	RuntimeException,运行时异常不需要在方法的定义中进行声明
+
+java.lang.object
+	|
+	|----java.lang.Throwable
+		|
+		---java.lang.Error	//硬伤
+		---java.lang.Exception	
+Throwable
+-----------------
+	可以抛出的
+	是所有异常和错误的超类
+	throw	//抛出异常对象的指令
+	throws	//在方法中声明抛出异常的关键字。
+
+Exception
+------------------
+	通过try-catch-finally语句解决
+	try{
+	 ...
+	}
+	catch(Throwable e){
+	 ...
+	}
+	finally{
+	 ...
+	}
+	可以有多个catch语句，catch的顺序需要注意。
+	子类异常需要先行catch，否则代码不可达，编译也无法通过
+	方法重写时，不能声明抛出新的异常类型，只能是原有异常类型体系。
+
+package
+-----------------
+	包。
+	类似于文件夹，组织管理类的结构。
+	包名通常由个人邮箱的相反顺序命名，com.163.wzd323echo.java.类名
+	完整类名：包名+“.”+类名
+
+编译程序
+--------------
+javac -d classes xxx.java	//-d指定存放 classes文件的位置
+javac -cp classes -d . xxx.java	//-cp指定编译程序时需要搜索的类路径顺序，类中引用其他类的时候用
+
+运行程序
+---------------
+	运行java程序，需要指定类的完整类名
+	java -cp classes com.itl8zhang.java1.PackageDemo1
+6.含有包名的类需要使用public修饰，否则无法再其他包中访问
+	package com.itl8zhang.java1;
+	public class PackageDemo1{
+	...
+	}
+7.引入包中的类，需要使用import关键字
+	import com.itl8zhang.java1.PackageDemo1;
+	public class xxx{}
+
+权限修饰符
+--------------
+	1.public
+	2.protect
+	3.default
+	4.private
+访问权限关系
+------------------
+	1.同类>同包>子类>不同包
+
+jar
+-------------------
+0.java archieve,java归档，打包
+1.jar war ear har
+2.对java的类文件进行归档
+	//将foo目录下的所有文件进行归档，生成xxx.jar
+	jar cvf xxx.jar -C foo/ .	
+	//归档时，指定入口点，会在清档文件中添加Mai-Class属性。
+	jar cvfe xx.jar com.itl8zhang.e.EE -C foo/classes .
+3.通过jar文件执行程序
+	java -cp xxx.jar com.itl8zhang.e.EE
+	java -cp xxx.jar;yy.jar;classes;..;d:\java com.itl8zhang.e.EE
+	java -jar xxx.jar		//执行程序		 	

@@ -1,0 +1,20 @@
+﻿1.Map集合没有直接取出元素的方法，而是先转成set集合，再通过迭代获取元素
+
+作业
+-------------------
+1.hashMap中的hash算法的实现原理，为什么？移位的意义？为什么是异或运算
+2.创建一个类student
+	有int height,int weight, int age,重写equals和hashCode
+	equals方法实现原则：三个属性都相同，即为对象相同。
+	hashCode:采用位运算
+3.使用Map集合实现集合嵌套
+	Map:key(String)-value对
+	//名单集合（一个班）
+	//key:学号 No100 Value:tomxxxx
+	Map<String,String> names=...
+
+	//班级集合（一个年级）
+	Map<String,Map<String,String>> classes...
+
+	//年级集合
+	Map<String,Map<String,Map<String,String>>> grades=...
