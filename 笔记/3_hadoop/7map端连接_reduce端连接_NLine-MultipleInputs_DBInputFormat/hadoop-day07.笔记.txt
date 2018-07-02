@@ -1,0 +1,641 @@
+排序
+--------------
+	1.部分排序
+		nothing!
+	2.全排序
+		2.1)一个reduce
+		2.2)自定义分区
+		2.3)采样
+	3.二次排序
+		对value排序。
+		设计组合key
+		自定义分区
+		自定义分组对比器
+		自定义排序对比器
+
+
+
+连接
+---------------
+	内连接
+	外链接
+	交叉连接
+	左外连接
+	右外连接
+	全外链接
+
+mr连接
+----------------
+	1.准备数据
+		[custs.txt]
+		1,tom,12
+		2,tomas,12
+		3,tomasLee,13
+		4,tomson,14
+		
+		[orders.txt]
+		1,no001,100.0,1
+		2,no001,100.0,1
+		3,no001,100.0,2
+		4,no001,100.0,2
+		5,no001,100.0,2
+		6,no001,100.0,3
+		7,no001,100.0,3
+		8,no001,100.0,3
+		9,no001,100.0,3
+
+		[]
+		1,no001,100.0,1,1,tom,12
+
+	2.map端连接
+		大表 + 小表(内存中容下)。
+		避免shuffle。没有reduce.
+		性能好。
+
+	3.reduce端
+		两张大表.
+		1)设计组合key
+			package com.it18zhang.hadoop.mr.join.reducejoin;
+
+			import org.apache.hadoop.io.WritableComparable;
+
+			import java.io.DataInput;
+			import java.io.DataOutput;
+			import java.io.IOException;
+
+			/**
+			 * 自定义组合key
+			 */
+			public class ComboKey implements WritableComparable<ComboKey>{
+				//标记 0:customer 1:order
+				private int tag ;
+				private int cid ;
+				private int oid ;
+
+				public ComboKey(){
+				}
+
+				public ComboKey(int tag, int cid, int oid) {
+					this.tag = tag;
+					this.cid = cid;
+					this.oid = oid;
+				}
+
+				public int getTag() {
+					return tag;
+				}
+
+				public void setTag(int tag) {
+					this.tag = tag;
+				}
+
+				public int getCid() {
+					return cid;
+				}
+
+				public void setCid(int cid) {
+					this.cid = cid;
+				}
+
+				public int getOid() {
+					return oid;
+				}
+
+				public void setOid(int oid) {
+					this.oid = oid;
+				}
+
+				public int compareTo(ComboKey o) {
+					int otag = o.getTag();
+					int ocid = o.getCid() ;
+					int ooid = o.getOid() ;
+
+					//当前customer
+					if(tag == 0){
+						//对方customer
+						if(otag == 0){
+							return cid - ocid ;
+						}
+						//对方order
+						else{
+							//该customer的order，customer排在前
+							if(cid == ocid){
+								return -1 ;
+							}
+							//不是该customer的order,按cust比较
+							else{
+								return cid - ocid ;
+							}
+						}
+					}
+					//当前order
+					else{
+						//对方是customer
+						if(otag == 0){
+							//是否同一cust
+							if(cid == ocid){
+								return 1 ;
+							}
+							//不是同一cust
+							else{
+								return cid - ocid ;
+							}
+						}
+						//订单
+						else{
+							//是否同一cust
+							if(cid == ocid){
+								return oid - ooid ;
+							}
+							//不是同一cust
+							else{
+								return cid - ocid ;
+							}
+						}
+					}
+				}
+
+				public void write(DataOutput out) throws IOException {
+					out.writeInt(tag);
+					out.writeInt(cid);
+					out.writeInt(oid);
+
+				}
+
+				public void readFields(DataInput in) throws IOException {
+					this.tag = in.readInt();
+					this.cid = in.readInt();
+					this.oid = in.readInt();
+
+				}
+			}
+
+		2)分区
+			package com.it18zhang.hadoop.mr.join.reducejoin;
+
+			import org.apache.hadoop.mapreduce.Partitioner;
+			import org.apache.hadoop.io.Text ;
+
+			/**
+			 * 按照cid分区
+			 */
+			public class CidPartitioner extends Partitioner<ComboKey,Text>{
+				public int getPartition(ComboKey key, Text text, int numPartitions) {
+					return key.getCid() % numPartitions;
+				}
+			}
+
+		3)Mapper
+			package com.it18zhang.hadoop.mr.join.reducejoin;
+
+			import org.apache.hadoop.io.LongWritable;
+			import org.apache.hadoop.io.Text;
+			import org.apache.hadoop.mapreduce.Mapper;
+			import org.apache.hadoop.mapreduce.lib.input.FileSplit;
+
+			import java.io.IOException;
+
+			/**
+			 *
+			 */
+			public class JoinMapper extends Mapper<LongWritable,Text,ComboKey,Text>{
+				protected void map(LongWritable key, Text value, Context context) throws IOException, InterruptedException {
+
+					String line = value.toString();
+					String[] arr = line.split(",");
+
+					FileSplit split = (FileSplit) context.getInputSplit();
+					String path = split.getPath().getName();
+					ComboKey outKey = new ComboKey() ;
+					//
+					if(path.contains("custs.txt")){
+						outKey.setTag(0);
+						outKey.setCid(Integer.parseInt(arr[0]));
+					}
+					else{
+						if(arr != null && arr.length > 3){
+							outKey.setTag(1);
+							outKey.setCid(Integer.parseInt(arr[3]));
+							outKey.setOid(Integer.parseInt(arr[0]));
+						}
+					}
+					context.write(outKey,value);
+				}
+			}
+
+		4)reduce
+			package com.it18zhang.hadoop.mr.join.reducejoin;
+
+			import org.apache.hadoop.io.NullWritable;
+			import org.apache.hadoop.io.Text;
+			import org.apache.hadoop.mapreduce.Reducer;
+
+			import java.io.IOException;
+			import java.util.Iterator;
+
+			/**
+			 *
+			 */
+			public class JoinReducer extends Reducer<ComboKey,Text,Text,NullWritable>{
+				protected void reduce(ComboKey key, Iterable<Text> values, Context context) throws IOException, InterruptedException {
+
+					Iterator<Text> it = values.iterator();
+					//提取第一个就是cust信息
+					String custInfo = it.next().toString() ;
+
+					while(it.hasNext()){
+						String order = it.next().toString();
+						context.write(new Text(order + "," + custInfo),NullWritable.get());
+					}
+				}
+			}
+		
+		5)App
+			package com.it18zhang.hadoop.mr.join.reducejoin;
+
+			import org.apache.hadoop.conf.Configuration;
+			import org.apache.hadoop.fs.FileSystem;
+			import org.apache.hadoop.fs.Path;
+			import org.apache.hadoop.io.NullWritable;
+			import org.apache.hadoop.io.Text;
+			import org.apache.hadoop.mapreduce.Job;
+			import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
+			import org.apache.hadoop.mapreduce.lib.input.TextInputFormat;
+			import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
+			import org.apache.hadoop.mapreduce.lib.output.TextOutputFormat;
+
+			import java.io.IOException;
+
+			/**
+			 * Created by Administrator on 2018/1/12.
+			 */
+			public class App {
+				public static void main(String[] args) throws Exception {
+					args = new String[]{"file:///d:/mr/join", "file:///d:/mr/out"};
+					if (args == null || args.length < 2) {
+						throw new Exception("参数不足,需要两个参数!");
+					}
+
+					Configuration conf = new Configuration();
+					conf.set("fs.defaultFS", "file:///");
+					FileSystem fs = FileSystem.get(conf);
+
+					//递归删除输出目录
+					fs.delete(new Path(args[1]), true);
+
+					//创建job
+					Job job = Job.getInstance(conf);
+					job.setJobName("App");
+					job.setJarByClass(App.class);
+
+					job.setInputFormatClass(TextInputFormat.class);
+					job.setOutputFormatClass(TextOutputFormat.class);
+
+					FileInputFormat.addInputPath(job, new Path(args[0]));
+					FileOutputFormat.setOutputPath(job, new Path(args[1]));
+
+					job.setMapperClass(JoinMapper.class);
+					job.setReducerClass(JoinReducer.class);
+
+					job.setMapOutputKeyClass(ComboKey.class);
+					job.setMapOutputValueClass(Text.class);
+
+					job.setOutputKeyClass(Text.class);
+					job.setOutputValueClass(NullWritable.class);
+					job.setPartitionerClass(CidPartitioner.class);
+					job.setGroupingComparatorClass(CidGroupComparator.class);
+					job.setSortComparatorClass(ComboKeySortComparator.class);
+
+					job.setNumReduceTasks(3);
+
+					job.waitForCompletion(true);
+				}
+			}
+
+
+InputFormat
+---------------
+	1.FileInputFormat
+	2.TextInputFormat
+	3.SequenceFileInputFormat
+	4.KeyValueTextInputFormat
+
+
+NLineInputFormat
+----------------
+	Nline作为一个切片，默认N = 1，可以通过mapreduce.input.lineinputformat.linespermap修改。
+	job.getConfiguration().set("mapreduce.input.lineinputformat.linespermap","3");
+	job.setInputFormatClass(NLineInputFormat.class);
+
+MultipleInputs
+-----------------
+	多种输入格式，输入文件有多种格式。
+	package com.it18zhang.hadoop.inputformat.multiple;
+
+	import com.it18zhang.hadoop.inputformat.nline.WCMapper;
+	import org.apache.hadoop.conf.Configuration;
+	import org.apache.hadoop.fs.FileSystem;
+	import org.apache.hadoop.fs.Path;
+	import org.apache.hadoop.io.IntWritable;
+	import org.apache.hadoop.io.NullWritable;
+	import org.apache.hadoop.io.Text;
+	import org.apache.hadoop.mapreduce.Job;
+	import org.apache.hadoop.mapreduce.lib.input.*;
+	import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
+	import org.apache.hadoop.mapreduce.lib.output.TextOutputFormat;
+
+	import java.io.IOException;
+
+	/**
+	 * Created by Administrator on 2018/1/12.
+	 */
+	public class App {
+		public static void main(String[] args) throws Exception {
+			args = new String[]{"file:///d:/mr/join/custs.txt", "file:///d:/mr/out"};
+			if (args == null || args.length < 2) {
+				throw new Exception("参数不足,需要两个参数!");
+			}
+
+			Configuration conf = new Configuration();
+			conf.set("fs.defaultFS", "file:///");
+			FileSystem fs = FileSystem.get(conf);
+
+			fs.delete(new Path(args[1]), true);
+
+			Job job = Job.getInstance(conf);
+			job.setJobName("App");
+			job.setJarByClass(App.class);
+			job.getConfiguration().set(KeyValueLineRecordReader.KEY_VALUE_SEPERATOR," ");
+			
+			//不同路径对应不同InputFormat和Mapper.
+			MultipleInputs.addInputPath(job,new Path("file:///d:/mr/temp.seq"), SequenceFileInputFormat.class , SeqMapper.class);
+			MultipleInputs.addInputPath(job,new Path("file:///d:/mr/temp.dat"), KeyValueTextInputFormat.class , KVMapper.class);
+			job.setOutputFormatClass(TextOutputFormat.class);
+
+			FileOutputFormat.setOutputPath(job, new Path(args[1]));
+
+			job.setReducerClass(MaxTempReducer.class);
+
+			//设置输出的kv类型
+			job.setOutputKeyClass(IntWritable.class);
+			job.setOutputValueClass(IntWritable.class);
+
+			job.setNumReduceTasks(3);
+			job.waitForCompletion(true);
+		}
+	}
+
+
+DBInputFormat
+-------------------
+	DBInputFormat<T extends DBWritable> extends InputFormat<LongWritable, T>
+	1.实现DBWritable接口
+		package com.it18zhang.hadoop.inputformat.db;
+
+		import org.apache.hadoop.io.Writable;
+		import org.apache.hadoop.mapreduce.lib.db.DBWritable;
+
+		import java.io.DataInput;
+		import java.io.DataOutput;
+		import java.io.IOException;
+		import java.sql.PreparedStatement;
+		import java.sql.ResultSet;
+		import java.sql.SQLException;
+
+		/**
+		 * DBWritable实现类
+		 */
+		public class MyDBWritable implements Writable,DBWritable {
+			public int id ;
+			public String orderno ;
+			public float price ;
+			public int cid ;
+
+			public void write(DataOutput out) throws IOException {
+				out.writeInt(id);
+				out.writeUTF(orderno);
+				out.writeFloat(price);
+				out.writeInt(cid);
+			}
+
+			public void readFields(DataInput in) throws IOException {
+				this.id = in.readInt();
+				this.orderno = in.readUTF() ;
+				this.price = in.readFloat() ;
+				this.cid = in.readInt() ;
+			}
+
+			public void write(PreparedStatement statement) throws SQLException {
+
+			}
+
+			//读取结果数据
+			public void readFields(ResultSet rs) throws SQLException {
+				this.id = rs.getInt(1) ;
+				this.orderno  = rs.getString(2) ;
+				this.price = rs.getFloat(3) ;
+				this.cid = rs.getInt(4) ;
+			}
+		}
+
+	2.Mapper
+		package com.it18zhang.hadoop.inputformat.db;
+
+		import org.apache.hadoop.io.FloatWritable;
+		import org.apache.hadoop.io.IntWritable;
+		import org.apache.hadoop.io.LongWritable;
+		import org.apache.hadoop.mapreduce.Mapper;
+
+		import java.io.IOException;
+
+		/**
+		 *
+		 */
+		public class OrderMapper extends Mapper<LongWritable,MyDBWritable,IntWritable,FloatWritable> {
+			protected void map(LongWritable key, MyDBWritable value, Context context) throws IOException, InterruptedException {
+				int cid = value.cid;
+				float price = value.price ;
+				context.write(new IntWritable(cid) , new FloatWritable(price));
+			}
+		}
+
+	3.Reducer
+		package com.it18zhang.hadoop.inputformat.db;
+
+		import org.apache.hadoop.io.FloatWritable;
+		import org.apache.hadoop.io.IntWritable;
+		import org.apache.hadoop.mapreduce.Reducer;
+
+		import java.io.IOException;
+
+		/**
+		 * 计算
+		 */
+		public class OrderReducer extends Reducer<IntWritable,FloatWritable, IntWritable,FloatWritable>{
+			protected void reduce(IntWritable key, Iterable<FloatWritable> values, Context context) throws IOException, InterruptedException {
+				float sum = 0 ;
+				for(FloatWritable fw : values){
+					sum = sum + fw.get() ;
+				}
+				context.write(key ,new FloatWritable(sum));
+			}
+		}
+
+	4.引入mysql的maven依赖
+        <dependency>
+            <groupId>mysql</groupId>
+            <artifactId>mysql-connector-java</artifactId>
+            <version>5.1.17</version>
+        </dependency>
+
+	5.App
+		package com.it18zhang.hadoop.inputformat.db;
+
+		import com.it18zhang.hadoop.inputformat.kvtext.KVTempMapper;
+		import com.it18zhang.hadoop.inputformat.kvtext.KVTempReducer;
+		import com.it18zhang.hadoop.mr.Appp;
+		import org.apache.hadoop.conf.Configuration;
+		import org.apache.hadoop.fs.FileSystem;
+		import org.apache.hadoop.fs.Path;
+		import org.apache.hadoop.io.FloatWritable;
+		import org.apache.hadoop.io.IntWritable;
+		import org.apache.hadoop.io.Text;
+		import org.apache.hadoop.mapreduce.Job;
+		import org.apache.hadoop.mapreduce.MRJobConfig;
+		import org.apache.hadoop.mapreduce.lib.db.DBConfiguration;
+		import org.apache.hadoop.mapreduce.lib.db.DBInputFormat;
+		import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
+		import org.apache.hadoop.mapreduce.lib.input.KeyValueLineRecordReader;
+		import org.apache.hadoop.mapreduce.lib.input.KeyValueTextInputFormat;
+		import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
+		import org.apache.hadoop.mapreduce.lib.output.TextOutputFormat;
+
+		import java.io.IOException;
+
+		/**
+		 * Created by Administrator on 2018/1/12.
+		 */
+		public class App {
+			public static void main(String[] args) throws Exception {
+				args = new String[]{"file:///d:/mr/temp.dat", "file:///d:/mr/out"};
+				if (args == null || args.length < 2) {
+					throw new Exception("参数不足,需要两个参数!");
+				}
+
+				Configuration conf = new Configuration();
+				conf.set("fs.defaultFS", "file:///");
+				FileSystem fs = FileSystem.get(conf);
+
+				fs.delete(new Path(args[1]), true);
+				Job job = Job.getInstance(conf);
+				job.setJobName("DBApp");
+				job.setJarByClass(App.class);
+
+				//配置数据库
+				String driver= "com.mysql.jdbc.Driver" ;
+				String url= "jdbc:mysql://localhost:3306/big9" ;
+				String user= "root" ;
+				String pass= "root" ;
+				//配置数据库连接
+				DBConfiguration.configureDB(job.getConfiguration() , driver,url,user,pass);
+
+				//总记录查询,供切片使用
+				job.getConfiguration().set(DBConfiguration.INPUT_COUNT_QUERY , "select count(1) from orders");
+
+				//输入类
+				job.getConfiguration().set(DBConfiguration.INPUT_CLASS_PROPERTY , "com.it18zhang.hadoop.inputformat.db.MyDBWritable");
+
+				//查询所有记录
+				job.getConfiguration().set(DBConfiguration.INPUT_QUERY , "select * from orders");
+
+				//
+				job.getConfiguration().set(MRJobConfig.NUM_MAPS,"2");
+
+				job.setInputFormatClass(DBInputFormat.class);
+				job.setOutputFormatClass(TextOutputFormat.class);
+
+				FileOutputFormat.setOutputPath(job, new Path(args[1]));
+
+				job.setMapperClass(OrderMapper.class);
+				job.setReducerClass(OrderReducer.class);
+
+				job.setMapOutputKeyClass(IntWritable.class);
+				job.setMapOutputValueClass(FloatWritable.class);
+
+				job.setOutputKeyClass(IntWritable.class);
+				job.setOutputValueClass(FloatWritable.class);
+
+				job.setNumReduceTasks(2);
+				job.waitForCompletion(true);
+			}
+		}
+
+作业
+------------------
+	1.独立实现taggen标签生成程序
+
+	2.实现如下连接查询
+		a)数据如下:
+			[nations.txt]
+			字典id,属性名
+			--------------
+			1,汉族
+			2,回族
+			3,满族
+			4,藏族
+			5,蒙古族
+
+			[careers.txt]
+			字典id,属性名
+			--------------
+			1,军人
+			2,学生
+			3,公务员
+			4,教师
+			5,政府官员
+			6.工人
+			7.农民
+			8.其他
+			
+			[custs.txt]
+			id,名称,年龄,民族,职业
+			-----------------------
+			1,tom1,12,1,5
+			2,tom2,13,5,6
+
+
+			[orders.txt]
+			订单id,订单号,价格,custid
+			----------------------------
+			1,no001,100.0,1
+			2,no001,100.0,1
+			3,no001,100.0,2
+			4,no001,100.0,2
+			5,no001,100.0,2
+
+			[items.txt]
+			订单项id,订单项名称,订单id
+			----------------------------
+			1,xx,1
+			2,xt,1
+			3,xt,2
+			4,xy,2
+			5,xz,3
+			6,zt,2
+			7,zy,3
+			8,zy,4
+			9,zy,4
+			10,zy,5
+			11,zy,5
+			12,zy,5
+
+		b)输出如下信息
+			1,xx,1-1,no001,100.0,1-1,tom1,12,汉族,政府官员
+
+		c)提示
+			字段数据采用map端连接，cust、order、item数据采用reduce端连接。
+
+	3.数据的InputFormat.
+		
+
+

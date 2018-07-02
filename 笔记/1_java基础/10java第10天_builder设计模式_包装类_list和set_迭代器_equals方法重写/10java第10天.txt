@@ -1,0 +1,28 @@
+﻿字符串编解码
+------------------------
+	编码：String----> byte[],str.getBytes();
+	解码：byte[]-->string,new String(byte[],Charset);
+StringBuffer
+-------------------------
+1.字符串缓冲区
+2.mutable,可变的
+3.java.lang.AbstractStringBuilder{char[] value}
+			|
+		       /|\
+			|-----java.lang.StringBuffer
+4.线程安全的
+
+StringBuilder
+--------------------------
+1.字符串构建器
+2.mutable,可变的
+3.java.lang.AbstractStringBuilder{char[] value}
+			|
+		       /|\
+			|-----java.lang.StringBuilder
+4.不是线程安全的
+
+
+练习
+--------------------
+创建数组列表，存放1000 Person对象，name是tom0 -tom999,age 0-100

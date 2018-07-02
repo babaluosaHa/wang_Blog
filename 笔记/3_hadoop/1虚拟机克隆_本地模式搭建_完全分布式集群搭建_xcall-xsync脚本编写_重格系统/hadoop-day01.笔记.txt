@@ -1,0 +1,335 @@
+﻿mysql
+------------
+	rdbms.
+	OLTP : online transaction process,在线事务处理。事务的特性：原子性等
+
+
+1Byte				//1字节
+1k					//1024
+1m					//
+1g					//1024m
+1t					//1024g
+1p					//1024t
+1e					//1024p
+1n					//
+
+
+
+大数据（分布式存储和分布式计算实质上是网络间通信）
+-----------
+	bigdata.
+	海量数据。
+	存储和计算。
+
+	google
+	hadoop		//doug cutting
+				//网页 GFS : google file system,ndfs
+
+	存储 ：分布式存储 ,hdfs
+	计算 : 分布式计算,mapredue,映射化简,编程模型(高度简化)
+
+	
+	hadoop		//存储.
+	spark		//计算
+
+
+
+虚拟机克隆
+----------
+	1.完整克隆
+		磁盘空间占用大，磁盘文件是独立。
+		克隆时间长
+
+	2.链接克隆。
+		秒克.
+		磁盘空间少。
+		增量数据维护。模板机存相同内容，克隆机1存不同内容，克隆机2存不同内容。
+		和模板机放在一起，不要改动模板机。
+
+hadoop
+--------------
+	分布式计算引擎。
+	包含四个模块:
+	1.common
+		公共模块，核心模块
+
+	2.hdfs
+		hadoop distributed file system,hadoop分布式文件系统。
+
+	3.mapreduce
+		MR,编程模型
+
+	4.yarn
+		资源调度框架
+
+
+hadoop集群部署模式
+----------------------
+	1.本地模式
+		nothing!
+		不需要启动hadoop进程。
+		通常用于调试测试。
+
+	2.伪分布式
+		通过一台机器搭建hadoop集群。
+		需要启动所有进程，只是所有进程都位于同一台主机。
+		
+	3.完全分布式
+		在不同主机上启动不同进程。
+		生产环境。
+
+搭建hadoop集群过程
+---------------------
+	1.链接克隆虚拟机
+
+	2.手动修改ip和主机名
+		
+	3.安装jdk
+		略，因为模板机已经安装了
+
+	4.安装hadoop
+		4.1)下载hadoop-2.7.3.tar.gz
+		4.2)复制到centos
+		4.3)tar开文件到/soft
+
+		4.4)配置环境变量
+			[/etc/profile]
+			HADOOP_HOME=/soft/hadoop
+			PATH=$PATH:$HADOOP_HOME/bin:$HADOOP_HOME/sbin
+
+		4.5)source profile，使其生效
+			$>source /etc/profile
+		
+		4.6)验证hadoop是否成功
+			$>hadoop version
+	
+搭建hadoop完全分布式
+--------------------
+	1.配置s101无密登录s102 ~ s104
+		1.1)在101上生成公私秘钥对（有点像电子签名）
+			$>ssh-keygen -t rsa -P '' -f ~/.ssh/id_rsa	// ssh:安全连接
+
+		1.2)对s101自身实现无密登录,添加公钥到认证库中
+			$>cd .ssh
+			$>cat id_rsa.pub >> authorized_keys	// authorized_keys 认证库名称、固定的
+		
+		1.3)修改authorized_keys文件的权限为755	// 755 r:4 w：2 x：1
+			$>cd .ssh
+			$>chmod 755 authorized_keys
+		
+		1.4)验证ssh本机
+			$>ssh localhost
+				yes
+			
+			$>exit
+			
+		1.5)使用ssh-copy-id复制当前用户的公钥到远程主机指定用户的认证库中。
+			$>ssh-copy-id centos@192.168.231.102
+			$>ssh-copy-id centos@192.168.231.103
+			$>ssh-copy-id centos@192.168.231.104
+		
+		1.6)对root也进行相同方式处理
+			同上。注意切换root下。
+		
+		1.7)修改所有的/etc/hosts文件,可通过主机名访问远程主机
+			a)修改101的/etc/hosts文件
+				127.0.0.1 localhost
+				192.168.231.101 s101
+				192.168.231.102 s102
+				192.168.231.103 s103
+				192.168.231.104 s104
+			
+			b)远程复制该文件到所有主机
+				 $>su root
+				 $>scp /etc/hosts root@s102:/etc/
+				 $>scp /etc/hosts root@s103:/etc/
+				 $>scp /etc/hosts root@s104:/etc/
+
+	2.通过scp复制/soft/hadoop到所有节点
+		$>scp -r /soft/hadoop-2.7.3  centos@s102:/soft/
+		$>scp -r /soft/hadoop-2.7.3  centos@s103:/soft/
+		$>scp -r /soft/hadoop-2.7.3  centos@s104:/soft/
+
+	3.登录102 ~ 102创建软连接
+		#102
+		$>ln -s hadoop-2.7.3 hadoop
+		#103
+		$>ln -s hadoop-2.7.3 hadoop
+		#104
+		$>ln -s hadoop-2.7.3 hadoop
+		
+	4.分发101的/etc/profile文件到所有主机
+		$>su root
+		$>scp /etc/profile root@s102:/etc/
+		$>scp /etc/profile root@s103:/etc/
+		$>scp /etc/profile root@s104:/etc/
+
+	5.对s101的hadoop配置目录创建软连接，好处是可以实现多种配置并存
+		$>cd /soft/hadoop/etc/
+		$>mv hadoop local	// 改名字
+		$>cp -r local full	// 如果full文件夹不存在，会自动创建
+		$>ln -s full hadoop
+
+	6.配置hadoop配置文件
+		[full/core-site.xml]
+		<?xml version="1.0"?>
+		<configuration>
+			<property>
+				<name>fs.defaultFS</name>
+				<value>hdfs://s101/</value>
+			</property>
+		</configuration>
+
+		[full/hdfs-site.xml]
+		<?xml version="1.0" encoding="UTF-8"?>
+		<?xml-stylesheet type="text/xsl" href="configuration.xsl"?>
+		<configuration>
+			<property>
+				<name>dfs.replication</name>
+				<value>3</value>
+			</property>
+		</configuration>
+
+		[full/mapred-site.xml]
+		<?xml version="1.0"?>
+		<?xml-stylesheet type="text/xsl" href="configuration.xsl"?>
+		<configuration>
+			<property>
+				<name>mapreduce.framework.name</name>
+				<value>yarn</value>
+			</property>
+		</configuration>
+
+		[full/yarn-site.xml]
+		<?xml version="1.0"?>
+		<configuration>
+			<property>
+				<name>yarn.resourcemanager.hostname</name>
+				<value>s201</value>
+			</property>
+			<property>
+				<name>yarn.nodemanager.aux-services</name>
+				<value>mapreduce_shuffle</value>
+			</property>
+		</configuration>
+
+	7.分发full目录到所有节点
+		$>cd /soft/hadoop
+		$>scp -r etc centos@s102:/soft/hadoop
+		$>scp -r etc centos@s103:/soft/hadoop
+		$>scp -r etc centos@s104:/soft/hadoop
+
+	8.配置java_home环境变量
+		/etc/hadoop/hadoop-env.sh
+		...
+		export JAVA_HOME=/soft/jdk
+		...
+
+
+	9.101格式化hadoop的hdfs（类似于新买的硬盘格式化）
+		$>hadoop namenode -format
+
+	
+	
+	10.分发hadoop-evn.sh
+		scp -r etc centos@s102:/soft/hadoop
+		scp -r etc centos@s103:/soft/hadoop
+		scp -r etc centos@s104:/soft/hadoop
+
+	11.配置/etc/hadoop/slaves文件并分发，slaves文件保存的是数据节点
+		s102
+		s103
+		s104
+		
+	12.启动hadoop集群
+		[101]
+		start-all.sh	// 停掉所有进程 stop-all.sh
+
+	13.查看进程
+		jps
+
+	14.关闭linux防火墙
+		[s101 ~ s104]
+		sudo service firewalld stop // 查看防火墙状态，service firewalld status
+
+	15.通过浏览器访问hdfs
+		http://s101:50070/
+	
+	16.创建hdfs目录
+		hdfs dfs -mkdir -p /user/centos/data
+		hdfs dfs -put 1.txt /user/centos/data
+
+
+远程拷贝
+-------------------
+	1.scp
+		不支持软连接
+
+	2.rsync
+		性能高scp，支持软连接。centos7没有内置，需要单独安装。
+		进行文件比对。
+		如果文件不改变，就不覆盖了，如此效率更高。（scp和rsync的区别）
+
+
+xcall.sh
+-----------------
+	1.在所有节点上执行相同的命令
+
+	2.xcall.sh
+		#!/bin/bash
+		for host in `cat /usr/local/bin/.hosts` ;
+		do
+		  tput setaf 2
+		  echo ======== $host ========
+		  tput setaf 7
+		  ssh $host "source /etc/profile;$@"
+		done
+
+
+xsync.sh
+----------------
+	1.使用方式
+		xsync.sh /etc/a/1.txt
+		basename /etc/a/1.txt ==> 1.txt
+		dirname /etc/a/1.txt ==> /etc/a
+		cd -P /etc/a
+		$> ssh s102 "source /etc/profile;jps |grep Node" // 出现管道符用“”
+		$> xcall.sh rm -rf /soft/hadoop/etc
+	2.编写脚本
+		#!/bin/bash
+		f=$1
+		filename=`basename $f`
+		dirname=`dirname $f`
+		cd -P $dirname	// -P 物理目录
+		path=`pwd`
+		who=`whoami`
+		for host in `tail -3 /usr/local/bin/.hosts` ; // 把第一行干掉
+		do
+		  tput setaf 2	// 绿色
+		  echo ======== $host ========
+		  tput setaf 7	// 白色
+
+		  rsync -lr $f $who@$host:$path	// l,软链接
+		done
+
+
+重新格式化hadoop
+-----------------
+	0.停掉hadoop集群
+		
+	1.删除所有节点的hadoop临时目录
+		默认临时目录在/tmp/hadoop-centos
+		$>xcall.sh rm -rf /tmp/hadoop-centos
+	2.删除hadoop所有日志
+		$>xcall.sh rm -rf /soft/hadoop/logs/*
+
+	3.格式化文件系统
+		$>hadoop namenode -format
+
+	4.启动集群
+		$>start-dfs.sh
+		$>start-yarn.sh
+
+	5.停止集群
+		$>stop-yarn.sh
+		$>stop-dfs.sh

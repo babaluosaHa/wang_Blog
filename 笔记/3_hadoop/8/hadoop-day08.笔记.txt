@@ -1,0 +1,310 @@
+输入格式
+-------------
+	TextInputFormat				//line
+	SequenceFileInputFormat		//seq文件，key-value
+	KeyValueTextInputFormat		//line , key - value
+	MultipleInputs				//多输入
+	DBInputFormat				//DBWritable,
+
+
+mysql分页查询
+-------------
+	select * from orders limit 3,4 ;			//
+	select * from orders limit 4 offset 4 ;		//
+
+	+----+---------+-------+------+
+	|  1 | no001   |   100 |    1 |
+	|  2 | no002   |   101 |    1 |
+	|  3 | no003   |   100 |    2 |
+	|  4 | no004   |   101 |    2 |
+	|  5 | no005   |   102 |    2 |
+	|  6 | no006   |   100 |    3 |
+	|  7 | no007   |   101 |    3 |
+	|  8 | no008   |   101 |    3 |
+	|  9 | no009   |   102 |    5 |
+	| 10 | no010   |   102 | NULL |
+			start   end - start
+	split-1 :start:0,end :5 
+	split-2 :start:5,end :10 
+
+	limit (end - start) offset start ;
+
+
+OutputFormat
+---------------
+	1.FileOutputFormat
+		抽象类，基于文件的输出格式的超类。
+		getRecordWriter();
+	
+	2.TextOutputFormat
+		内部类 : LineRecordWriter,分隔符默认\t.
+		//控制key-value分隔符
+		TextOutputFormat.SEPERATOR = "mapreduce.output.textoutputformat.separator" ;
+		//控制是否压缩
+		FileOutputFormat.COMPRESS ="mapreduce.output.fileoutputformat.compress";
+		//压缩编解码器 
+		FileOutputFormat.COMPRESS_CODEC="mapreduce.output.fileoutputformat.compress.codec"
+
+	3.SequenceFileOutputFormat
+		//控制是否压缩
+		FileOutputFormat.COMPRESS ="mapreduce.output.fileoutputformat.compress";
+		//压缩类型
+		FileOutputFormat.COMPRESS_TYPE = "mapreduce.output.fileoutputformat.compress.type"		//NONE, RECORD or BLOCK.
+		//压缩编解码器 
+		FileOutputFormat.COMPRESS_CODEC="mapreduce.output.fileoutputformat.compress.codec"
+		//设置输出文件的基本名称
+		FileOutputFormat.BASE_OUTPUT_NAME="mapreduce.output.basename"							//part
+
+	4.DBOutputFormat
+		1.Mapper
+			package com.it18zhang.hadoop.output.db;
+
+			import org.apache.hadoop.io.IntWritable;
+			import org.apache.hadoop.io.LongWritable;
+			import org.apache.hadoop.io.Text;
+			import org.apache.hadoop.mapreduce.Mapper;
+			import org.apache.hadoop.mapreduce.lib.db.DBConfiguration;
+
+			import java.io.IOException;
+			import java.sql.Connection;
+			import java.sql.Statement;
+
+			/**
+			 */
+			public class WCMapper extends Mapper<LongWritable, Text, Text, IntWritable> {
+				/**
+				 * key : 行首偏移量，字节数，意义不大。
+				 * value ： 一行文本
+				 */
+				protected void map(LongWritable key, Text value, Context context) throws IOException, InterruptedException {
+					//
+					String line = value.toString();
+					String[] arr = line.split(" ");
+
+					Text keyOut = new Text();
+					IntWritable valueOut = new IntWritable(1);
+					for (String word : arr) {
+						keyOut.set(word);
+						context.write(keyOut, valueOut);
+					}
+				}
+
+				//清除数据
+				protected void cleanup(Context context) throws IOException, InterruptedException {
+					try {
+						DBConfiguration dbConf = new DBConfiguration(context.getConfiguration()) ;
+						Connection conn = dbConf.getConnection() ;
+						Statement st = conn.createStatement();
+						st.executeUpdate("delete from wc");
+						st.close();
+						conn.close();
+					} catch (Exception e) {
+						e.printStackTrace();
+					}
+				}
+			}
+		2.MyDBWritable
+			package com.it18zhang.hadoop.output.db;
+
+			import org.apache.hadoop.io.Writable;
+			import org.apache.hadoop.mapreduce.lib.db.DBWritable;
+
+			import java.io.DataInput;
+			import java.io.DataOutput;
+			import java.io.IOException;
+			import java.sql.PreparedStatement;
+			import java.sql.ResultSet;
+			import java.sql.SQLException;
+
+			/**
+			 */
+			public class MyDBWritable implements DBWritable,Writable{
+				private String word ;
+				private int count ;
+
+				public void write(DataOutput out) throws IOException {
+					out.writeUTF(word);
+					out.writeInt(count);
+
+				}
+
+				public void readFields(DataInput in) throws IOException {
+					this.word = in.readUTF() ;
+					this.count = in.readInt() ;
+
+				}
+
+				public void write(PreparedStatement st) throws SQLException {
+					st.setString(1 , word);
+					st.setInt(2,count);
+
+				}
+
+				public void readFields(ResultSet resultSet) throws SQLException {
+
+				}
+			}
+
+		3.Reducer
+			package com.it18zhang.hadoop.output.db;
+
+			import org.apache.hadoop.io.IntWritable;
+			import org.apache.hadoop.io.NullWritable;
+			import org.apache.hadoop.io.Text;
+			import org.apache.hadoop.mapreduce.Reducer;
+
+			import java.io.IOException;
+
+			/**
+			 */
+			public class WCReducer extends Reducer<Text, IntWritable, MyDBWritable, NullWritable> {
+				protected void reduce(Text key, Iterable<IntWritable> values, Context context) throws IOException, InterruptedException {
+					int count = 0;
+					for (IntWritable iw : values) {
+						count = count + iw.get();
+					}
+					MyDBWritable outKey = new MyDBWritable();
+					outKey.setWord(key.toString()) ;
+					outKey.setCount(count);
+					context.write(outKey,NullWritable.get());
+				}
+			}
+		4.App
+			package com.it18zhang.hadoop.output.db;
+
+			import com.it18zhang.hadoop.output.*;
+			import org.apache.hadoop.conf.Configuration;
+			import org.apache.hadoop.fs.FileSystem;
+			import org.apache.hadoop.fs.Path;
+			import org.apache.hadoop.io.IntWritable;
+			import org.apache.hadoop.io.NullWritable;
+			import org.apache.hadoop.io.Text;
+			import org.apache.hadoop.mapreduce.Job;
+			import org.apache.hadoop.mapreduce.lib.db.DBConfiguration;
+			import org.apache.hadoop.mapreduce.lib.db.DBOutputFormat;
+			import org.apache.hadoop.mapreduce.lib.db.DBWritable;
+			import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
+			import org.apache.hadoop.mapreduce.lib.input.TextInputFormat;
+			import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
+			import org.apache.hadoop.mapreduce.lib.output.SequenceFileOutputFormat;
+
+			import java.io.IOException;
+
+			/**
+			 * Created by Administrator on 2018/1/14.
+			 */
+			public class App {
+				public static void main(String[] args) throws Exception {
+					Configuration conf = new Configuration();
+					conf.set("fs.defaultFS", "file:///");
+					FileSystem fs = FileSystem.get(conf);
+
+					//创建job
+					Job job = Job.getInstance(conf);
+					job.setJobName("outApp");
+					job.setJarByClass(com.it18zhang.hadoop.output.App.class);
+
+					//配置数据库
+					String driver = "com.mysql.jdbc.Driver";
+					String url = "jdbc:mysql://localhost:3306/big9";
+					String user = "root";
+					String pass = "root";
+					DBConfiguration.configureDB(job.getConfiguration(),driver,url,user,pass);
+
+					//设置表名
+					job.getConfiguration().set(DBConfiguration.OUTPUT_TABLE_NAME_PROPERTY,"wc");
+					//设置字段列表
+					job.getConfiguration().set(DBConfiguration.OUTPUT_FIELD_NAMES_PROPERTY,"word,cnt");
+
+
+					job.setInputFormatClass(TextInputFormat.class);
+					job.setOutputFormatClass(DBOutputFormat.class);
+
+					FileInputFormat.addInputPath(job, new Path("file:///d:/mr/wc/1.txt"));
+
+					job.setMapperClass(WCMapper.class);
+					job.setReducerClass(WCReducer.class);
+
+					//设置输出的kv类型
+					job.setMapOutputKeyClass(Text.class);
+					job.setMapOutputValueClass(IntWritable.class);
+
+					job.setOutputKeyClass(MyDBWritable.class);
+					job.setOutputValueClass(NullWritable.class);
+
+					//设置reduce个数
+					job.setNumReduceTasks(2);
+
+					//开始作业
+					job.waitForCompletion(true);
+				}
+			}
+
+
+counter
+-----------------
+	计数器,主要用于调试。
+	job.waitForCompletion(true);
+	统计运行时信息，发送数据client。
+	context.getCounter("m", "WCMapper.cleanup").increment(1);
+
+
+考察mr作业在集群上的提交流程
+---------------------------
+	1.提价maven依赖
+        <dependency>
+            <groupId>org.apache.hadoop</groupId>
+            <artifactId>hadoop-yarn-server-resourcemanager</artifactId>
+            <version>2.7.3</version>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.hadoop</groupId>
+            <artifactId>hadoop-yarn-server-nodemanager</artifactId>
+            <version>2.7.3</version>
+        </dependency>
+
+
+java远程调试
+----------------
+	1.编写java程序
+		package com.it18zhang.redebug;
+
+		/**
+		 * Created by Administrator on 2018/1/14.
+		 */
+		public class App {
+			public static void main(String[] args) {
+				System.out.println(1);
+				System.out.println(2);
+				System.out.println(3);
+				System.out.println(4);
+				System.out.println(5);
+				System.out.println(6);
+			}
+		}
+
+	2.导出jar到centos
+		
+	3.在centos上使用如下命令启动java程序,启动了socket地址。
+		java -agentlib:jdwp=transport=dt_socket,server=y,suspend=y,address=8888 -cp  my-java.jar com.it18zhang.redebug.App 
+
+	4.在idea配置远程调试
+		...
+
+通过远程调试查看mr作业提交流程
+-------------------------------
+	1.导出mr程序jar到centos下。
+		..
+	2.配置/etc/hadoop/hadop-env.sh的配置文件
+		...
+		# The following applies to multiple commands (fs, dfs, fsck, distcp etc)
+		export HADOOP_CLIENT_OPTS="-Xmx512m $HADOOP_CLIENT_OPTS"
+		#enable remote debug!
+		export HADOOP_CLIENT_OPTS="-agentlib:jdwp=transport=dt_socket,server=y,suspend=y,address=8888 $HADOOP_CLIENT_OPTS"
+		
+	3.在centos使用如下命令提交作业
+		hadoop jar my-hadoop.jar com.it18zhang.hadoop.mr.Appp
+
+	4.
+	5.
+	6.

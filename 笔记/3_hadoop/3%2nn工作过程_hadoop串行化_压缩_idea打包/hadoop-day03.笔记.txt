@@ -1,0 +1,482 @@
+﻿  大数据特点
+------------------
+	1.Volumn
+		体量大
+		TB PB
+
+	2.velocity
+		速度快
+
+	3.variaty
+		样式多
+		数据格式。
+		mysql : rdbms,
+		非结构化 ：文本、日志
+		变结构化 :xml excel
+
+	4.valueless
+		价值密度低。
+
+bigdata
+------------------
+	去IOER
+	IBM				//IBM小型机
+	Oracle			//数据库厂商
+	EMC				//网络存储设备,共享存储
+	RAID			//冗余磁盘阵列
+
+	廉价设备。		//伸缩性
+	
+
+hadoop
+-----------------
+	common
+	hdfs
+	yarn
+	mapreduce
+
+
+hdfs
+-------------
+	hadoop distributed files system. 
+	namenode（进程）			//master,元数据,路径，副本，权限，block大小
+						//image + edit.
+
+	datanode
+	2namenode
+
+	[128m]
+		1%,寻道是时间占用读取数据时间。
+		寻道时间10ms
+	SPOF				//single point of failure,单点故障。
+
+safemode
+------------
+	hdfs dfsadmin -safemode get
+	hdfs dfsadmin -safemode enter
+	hdfs dfsadmin -safemode leave
+	hdfs dfsadmin -safemode wait
+
+OIV
+-------------
+	offline image viewer
+
+OEV
+-------------
+	offline edit viewer
+
+rollEdits
+
+saveNamespace
+
+linux
+---------------
+
+配额管理
+---------------
+	1.目录配额
+		限制目录下的孩子的个数，1表示是个空目录。
+		防止目录过大，或者内容过多。
+		
+		$>hdfs dfsadmin -setQuota 1 data		//设置目录配额
+		$>hdfs dfsadmin -clrQuota data			//清除目录配额
+
+	2.空间配额
+		限制目录下所有文件的整体大小。
+		空间配额对于副本也计算在内，还受到blocksize的限制。
+		空间配额起码 = blocksize * 3 * n
+		$>hdfs dfsadmin -setSpaceQuota 384m data		//设置空间配额，webUI不显示配额
+		$>hdfs dfsadmin -clrSpaceQuota data				//清除空间配额
+
+快照（运维）
+---------------
+	快速副本化。备份手段。						//帮助文档[]表示可写可不写
+	目录默认是不能快照的。
+	快照采用的增量数据保存的方式实现。
+	快照目录不能删除。
+	恢复快照可以通过移动快照文件到指定目录下即可。
+	hdfs dfsadmin -allowSnapshot data					//对目录启用快照
+	hdfs dfsadmin -disallowSnapshot data				//对目录禁用快照
+	hdfs dfs -appendtoFile 2.txt data/1.txt				//将2.txt文件内容追加到1.txt文件内容之后
+
+	hdfs dfs -createSnapshot data sp_1					//对目录创建快照
+	hdfs dfs -renameSnapshot data sp_1	sp_2			//对目录重命名快照
+	hdfs dfs -deleteSnapshot data sp_1					//对删除快照
+
+	hdfs lsSnapshottableDir								//列出可快照的目录
+	hdfs snapshotDiff data sp_1 sp_2					//判断两个快照的不同
+
+
+2NN工作过程（针对名称节点单点故障引入）
+--------------
+	
+	1.原理
+		周期性检查NN的状态，满足条件后，对NN的image和edit进行融合，创建新的image文件。
+		1.1)2NN检查NN的状态
+		1.2)满足条件后，NN滚动日志。
+		1.3)复制Image + Edit到2NN
+		1.4)在2NN处进行融合，产生新image
+		1.5)回传新image给NN
+		1.6)覆盖nn原来早期的image。
+	
+	2.相关配置信息
+		[hdfs-site.xml]
+		<property>
+		  <name>dfs.namenode.checkpoint.period</name>
+		  <value>3600</value>
+		  <description>两次周期性检查间隔秒数(1小时)</description>
+		</property>
+
+		<property>
+		  <name>dfs.namenode.checkpoint.txns</name>
+		  <value>1000000</value>
+		  <description>如果操作次数达到1000000次，触发融合</description>
+		</property>
+
+		<property>
+		  <name>dfs.namenode.checkpoint.check.period</name>
+		  <value>60</value>
+		  <description>2nn检查NN的秒数(默认1分钟)</description>
+		</property>
+
+		<property>
+		  <name>dfs.namenode.checkpoint.max-retries</name>
+		  <value>3</value>
+		  <description>失败后重试次数限制</description>
+		</property>
+
+		<property>
+		  <name>dfs.namenode.num.checkpoints.retained</name>
+		  <value>2</value>
+		  <description>保留的镜像文件个数。默认是2个。</description>
+		</property>
+
+
+trash
+----------------
+	1.回收站
+		hdfs默认是关闭回收站功能，删除文件时直接删除，没有保留。
+
+	2.配置方式
+		[core-site.xml]
+		<property>
+		  <name>fs.trash.interval</name>
+		  <value>1</value>
+		  <description>
+			删除文件后在回收站保留的分钟数。默认0，表示禁用回收站。
+			可两端配置server和client。server禁用的话，检查client。
+			如果server启用，忽律client.
+		  </description>
+		</property>
+
+		<property>
+		  <name>fs.trash.checkpoint.interval</name>
+		  <value>1</value>
+		  <description>两次检查回收站的间隔数(默认0分钟),0表示和fs.trash.interval相同。</description> 
+		  // 设置值<<fs.trash.interval
+		</property>
+
+	3.通过hdfs dfs -rm文件会进入回收站，程序删除的文件不进入回收站
+		$>hdfs dfs -rm 1.txt				//删除文件到回收站
+		$>hdfs dfs -expunge					//清理回收站,不是清空，删除过期的文件
+
+	4.修改配置后，重启集群
+		
+	5.如果程序文件也进入回收站，需要通过moveToTrash()方法
+		Trash trash = new Trash(conf);
+		trash.moveToTrash()					//方法调用回收站
+
+		/**
+		 *
+		 * 测试回收站
+		 */
+		@Test
+		public void testTrash() throws Exception {
+			Configuration conf = new Configuration();
+			FileSystem fs = FileSystem.get(conf) ;
+			Path p = new Path("222.txt") ;
+			Trash trash = new Trash(conf);
+			trash.moveToTrash(p) ;// idea 搜索moveToTrash
+			//清理回收站
+			trash.expunge();
+		}
+
+提取镜像文件
+-----------------
+	下载集群最新的镜像文件到本地目录下。
+	$>hdfs dfsadmin -fetchImage .
+	$>hdfs dfsadmin -help -fetchImage .
+
+ 元数据保存
+ ----------------
+	保存namenode的主要的数据结构到log目录下。
+	是hdfs集群的统计信息。
+
+	$>hdfs dfsadmin -metasave 1.meta
+
+
+串行化
+------------------
+	将对象用于网络间传输或者本地化存储。
+	深度复制，复制整个对象图。java的串行化过于复杂，而且效率不高。                                                                                                                                                                                                                                                                                        
+	将对象转换某种格式的byte[]
+	1.java
+		java.io.Serializable
+		ObjectInputStream
+		ObjectOutputStream
+
+	2.hadoop
+		hadoop的串行化，在size层面上存储纯粹的数据。
+		不含附加信息，比如包名、类名、字段类型名称等等。
+
+		writable
+		java	hadoop
+		----------------------
+		byte	ByteWritable
+		short	ShortWritable
+		int		IntWritable
+		long	LonWritable
+		float	FloatWritable
+		double	DoubleWritable
+		char	--
+		boolean	BooleanWritable
+		String	Text
+		Map     MapWritable
+		//
+		package com.it18zhang.hadoop.serial;
+
+		import org.apache.hadoop.io.Writable;
+
+		import java.io.DataInput;
+		import java.io.DataOutput;
+		import java.io.IOException;
+
+		/**
+		 * Person对象串行化类，hadoop串行化需要实现writable接口
+		 */
+		public class PersonWritable implements Writable {
+
+			private Person p = new Person() ;
+
+			public PersonWritable(Person p){
+				this.p = p ;
+			}
+
+			public PersonWritable(){	// 反串时用
+			}
+
+			public Person getP() {
+				return p;
+			}
+
+			public void setP(Person p) {
+				this.p = p;
+			}
+
+			/**
+			 * 串行
+			 */
+			public void write(DataOutput out) throws IOException {
+				out.writeInt(p.getId());
+				out.writeUTF(p.getName());
+				out.writeInt(p.getAge());
+			}
+
+			/**
+			 * 反串行 , 切记读写顺序要一致。
+			 */
+			public void readFields(DataInput in) throws IOException {
+				int id = in.readInt();
+				String name = in.readUTF() ;
+				int age = in.readInt() ;
+				p.setId(id);
+				p.setName(name);
+				p.setAge(age);
+
+			}
+		}
+
+
+	3.对比
+		1.integer(100)
+							java				hadoop
+							----------------------------------
+			size			         81				4
+			串行time(ns)	                 10,621,929			101,390,913
+			反串行time(ns)	               7,942,328			97,914,041
+
+		2.String(tomas)
+							java				hadoop
+							----------------------------------
+			size			         12				6
+			串行time(ns)	                 11,018,512			141,040,968
+			反串行time(ns)	                 ?					?
+
+		2.person(bean)
+							java				hadoop
+							----------------------------------
+			size			        216				15
+			串行time(ns)	                12,977,614			4,380,473
+			反串行time(ns)	                10,759,871			2,380,728
+
+
+文件归档（ ）
+--------------
+	每个文件在nn的存放150字节。
+	大量小文件存在极大消耗的NN的空间。
+	手段之一、归档。之二，合并为序列文件
+
+	1.使用mr(mapreduce)作业，需要启动yarn集群
+		$>start-yarn.sh	// 启动yarn之后，所有节点都启动了？ 
+				// hdfs dfs -deleteSnapshot data sp-1,删除快照
+
+	2.归档
+		//-p指定归档的父目录 data1 data2父目录下要归档的目录 /usr存放归档文件的地方。
+		$>hadoop archive -archiveName my.har -p /user/centos data1 data2 /usr
+
+	3.查看归档文件
+		$>hdfs dfs -lsr har:///usr/my.har	// webUI查看端口8088
+		$>hdfs dfs -cat har:///usr/my.har/data1/1.txt
+
+
+压缩(很实用)
+--------------
+	1.压缩
+		Compression format		Tool		Algorithm		Filename extension		Splittable?
+		压缩格式			工具		算法			文件扩展名			是否可切割
+		----------------------------------------------------------------------------------------
+		DEFLATE			        N/A		DEFLATE			.deflate				No
+		gzip				gzip		DEFLATE			.gz					No
+		bzip2				bzip2		bzip2			.bz2					Yes
+		LZO				lzop		LZO			.lzo					No
+		LZ4				N/A		LZ4			.lz4					No
+		Snappy				N/A		Snappy			.snappy					No
+
+
+	2.Codecs
+		压缩编解码器
+		对压缩算法的代码实现。
+		Compression format				Hadoop CompressionCodec
+		压缩格式						编解码器类
+		----------------------------------------------
+		DEFLATE							org.apache.hadoop.io.compress.DefaultCodec
+		gzip							org.apache.hadoop.io.compress.GzipCodec
+		bzip2							org.apache.hadoop.io.compress.BZip2Codec
+		LZO								com.hadoop.compression.lzo.LzopCodec
+		LZ4								org.apache.hadoop.io.compress.Lz4Codec
+		Snappy							org.apache.hadoop.io.compress.SnappyCodec
+
+	3.程序测试
+		.deflate	:885655696		:11546043
+		.gz		:836843596		:11546055
+		.bz2		:15037416301	        :11624215
+		.lzo_deflate    :95638001		:12617438
+		.lz4		:53861755		:12125442
+
+		[压缩评测(pdf)]
+		时间	:lz4 < lzo < gz < deflate < bz2
+		空间	:deflate(84.76%) < gz(84.76%) < bz2(85.34%) < lz4(89.02%) < lzo(92.63%)
+
+		[解压缩评测(pdf)]
+		时间	:lz4 < lzo < deflate < gz < bz2
+
+		[压缩评测(txt)]
+		时间	:lz4 < lzo < deflate < gz < bz2
+		空间	:bz2(5.56%) < deflate(7.92%) < gz(7.92%) < lz4(15.30%) < lzo(15.87%)
+
+
+	4.在linux上运行压缩程序（从idea中导出jar包）
+		4.1)设置工件导出
+			project structure -> artifact -> + -> my-hadoop -> output -> 删除所有的jar文件，只保留'my-hadoop compile output'
+
+		4.2)菜单 -> build -> build artifacts -> build
+
+		4.3)找到导出的jar文件
+			project structure -> artifact -> + -> my-hadoop -> output directory就是jar所在地。
+		
+		4.4)复制jar到linux。（使用winscp）
+
+		4.5)添加lzo的类库到hadoop的类路径下
+			
+
+		4.6)登录linux，使用如下命令执行程序
+			//查看文件列表
+			$>jar -tf my-hadoop.jar	// 查看jar包的文件内容
+			$>java -cp my-hadoop.jar 完整类名 参数1 参数2
+
+			//使用hadoop命令执行程序
+			$>hadoop jar my-hadoop com.it18zhang.hadoop.compress.CompressDemo /home/centos/downloads/log4j.properties /home/centos/downloads/log4j.properties 
+			
+		4.7)评测结果
+			[压缩]
+			时间	:lz4 < deflate < lzo < gz < bz2
+			空间	:deflate(23.28) < gz(23.39%) < bz2(24.13%) < lzo(35.34%) < lz4(37.51%)
+
+windows7上运行hadoop程序，报出winutils.exe错误 
+-------------------------------------------
+	1.安装的hadoop缺少相应的库文件。
+
+	2.下载bin.rar文件，解压出来的内容放到
+		hadoop/bin/下
+
+	3.同时bin.rar解压的文件放置到系统目录
+		C:\Windows\System32
+		C:\Windows\SysWOW64
+
+	4.配置windows的环境变量，HADOOP_HOME和path
+		HADOOP_HOME=C:\myprograms/hadoop-2.7.2
+		
+	5.重启idea即可。
+
+hadoop文件格式
+----------------
+	1.sequencefile
+		序列文件。(最大的好处是可以切割)
+		SEQ头
+		版本
+		K类
+		V类型
+		压缩类型
+		压缩编解码类型
+		同步点
+
+	2.创建seq文件。
+		@Test
+		public void testWrite() throws Exception {
+			//FileSystem fs, Configuration conf, Path name,
+			//Class keyClass, Class valClass, SequenceFile.CompressionType compressionType, CompressionCodec codec
+			Configuration conf = new Configuration() ;
+
+			//设置文件系统
+			conf.set("fs.defaultFS" , "file:///");	// 不用改配置文件
+			FileSystem fs = FileSystem.get(conf) ;
+
+			Path p = new Path("file:///d:/mr/seq/1.seq") ;
+			CompressionCodec codec = ReflectionUtils.newInstance(Lz4Codec.class , conf) ;
+			//创建序列文件书写器
+			SequenceFile.Writer w = SequenceFile.createWriter(fs,conf ,p , IntWritable.class, Text.class , SequenceFile.CompressionType.NONE , codec ) ;	// SequenceFile.CompressionType.NONE 枚举类型共3种
+			IntWritable key = new IntWritable() ;
+			Text value = new Text() ;
+			for(int i = 0 ; i < 10000 ; i ++){
+				key.set(i);
+				value.set("tom" + i);
+				w.append(key,value);
+			}
+			w.close();
+		}
+
+	3.查看seq文件方式 // windows下也可以使用hadoop命令
+		默认 : 194k
+		每个kv加一次同步点 ：389k
+
+		cmd>hdfs dfs -text file:///d:/mr/seq/1.seq
+
+	4.sequenceFile
+		//设置同步点
+		writer.sync()
+
+		//绝对定位，不能准确地找到同步点，容易出错
+		read.seek(xxx)
+
+		//寻找同步点，读取，定位同步点
+		read.sync(xxx)

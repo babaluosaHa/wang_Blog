@@ -1,0 +1,9 @@
+﻿练习
+-------------------
+1.创建Customers表
+		customers{id int primary key auto_increment,name varchar(20),sex int ,age int};
+2.创建Customer类
+		...
+3.JDBCUtill.java
+	工具类
+4.CustomerDao

@@ -1,0 +1,465 @@
+﻿ MR
+-----------
+	mapreduce,编程模型。
+	映射和化简。
+	Key-value.
+	map的个数通过计算切片得到。
+
+hadoop jar my-hadoop.jar xx.x.x.xxxx input output
+
+App
+-----------
+	Configuration.
+	MRJobConfig				//封装了很多常量
+	job.setJobName()		//mapreduce.job.name=xxx
+	job.setJarByClass()		//mapreduce.job.jar=xxx
+							//mapreduce.input.fileinputformat.inputdir
+							//mapreduce.output.fileoutputformat.outputdir
+							//mapreduce.job.map.class
+							//mapreduce.job.reduces		
+
+jobStagingArea
+---------------
+
+	file:/home/centos/hadoop/full/mapred/staging/Administrator1083689187/.staging/
+
+JOBID
+--------------
+	job_local1594077359_0001
+
+submitDir
+------------
+	file:/home/centos/hadoop/full/mapred/staging/Administrator1083689187/.staging/job_local1083689187_0001
+
+submitJobFile
+------------
+	file:/home/centos/hadoop/full/mapred/staging/Administrator1083689187/.staging/job_local1083689187_0001/job.xml
+
+SystemJobDir
+-------------
+	file:/home/centos/hadoop/full/mapred/staging/Administrator1083689187/.staging/job_local1083689187_0001
+
+localJobFile
+---------------
+	file:/home/centos/hadoop/full/mapred/local/localRunner/Administrator/job_local1083689187_0001/job_local1083689187_0001.xml
+
+切片的计算法则(面试)
+-----------------
+	> hdfs getconf -confkey mapreduce.input.fileinputformat.split.minsize	//查看属性配置
+	//切片的最小值设置
+	mapreduce.input.fileinputformat.split.minsize=0			//默认值0，字节
+	mapreduce.input.fileinputformat.split.maxsize=missing	//缺失
+
+	1.minSplitSize
+		取得最小切片值，最小为1.
+	
+	2.maxSplitSize
+		默认不设置，取Long的最大值。
+
+	3.blockSize
+		 
+
+	4.切片算法
+		从最小切片数、最大切片数、blocksize选择中数.
+		long splitSize = Math.max(minSize, Math.min(maxSize, blockSize));
+		1.minSize < blockSize < maxSize
+			blockSize
+
+		2.minSize <  maxSize < blockSize
+			maxSize
+		
+		3.blockSize < minSize <  maxSize
+			minsize
+		
+	
+
+
+GOF
+------------
+	单例
+	工厂
+	装饰
+	builder
+	adaptor
+	prototype （原型模式）
+	pool		//ExecutorService
+
+
+java线程池
+--------------
+	ExecutorService
+	生产消费模式
+	线程是消费者
+	queue是容器，存放task。
+
+
+MapReduce本地模式工作流程
+--------------------------
+	1.描述
+		a)计算切片信息，将切片和作业的配置文件上传到作业提交目录，
+		b)转换外job到内部job线程，在内部job中计算map和reduce任务集合，
+		c)通过线程池执行task。
+
+
+切片设置(1行不可能分成两半)
+------------------------
+	package com.it18zhang.hadoop.mr;
+
+	import org.apache.hadoop.conf.Configuration;
+	import org.apache.hadoop.fs.FileSystem;
+	import org.apache.hadoop.fs.Path;
+	import org.apache.hadoop.io.IntWritable;
+	import org.apache.hadoop.io.Text;
+	import org.apache.hadoop.mapreduce.Job;
+	import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
+	import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
+
+	import java.io.FileInputStream;
+	import java.io.IOException;
+
+	/**
+	 */
+	public class App {
+		public static void main(String[] args) throws Exception {
+			args = new String[]{"file:///d:/mr/wc/1.txt" , "file:///d:/mr/wc/out"} ;
+			if(args == null || args.length < 2){
+				throw new Exception("参数不足,需要两个参数!") ;
+			}
+
+			Configuration conf = new Configuration() ;
+			conf.set("fs.defaultFS","file:///");
+			FileSystem fs = FileSystem.get(conf) ;
+
+			//递归删除输出目录
+			fs.delete(new Path(args[1]),true) ;
+
+			//创建job
+			Job job = Job.getInstance(conf)	;
+			job.setJobName("word_count_app");
+			job.setJarByClass(App.class);
+
+			//设置切片大小，方法一
+	//		job.getConfiguration().set("mapreduce.input.fileinputformat.split.minsize" , "10");	// 对原来配置的拷贝，一定要get出来
+	//		job.getConfiguration().set("mapreduce.input.fileinputformat.split.maxsize" , "10");
+			
+			//设置切片大小，方法二
+			FileInputFormat.setMinInputSplitSize(job,10);
+			FileInputFormat.setMaxInputSplitSize(job,10);
+
+			//添加输入路径
+			FileInputFormat.addInputPath(job,new Path(args[0]));
+			//设置输出路径
+			FileOutputFormat.setOutputPath(job , new Path(args[1]));
+
+			//设置mapper类和reducer类
+			job.setMapperClass(WordCountMapper.class);
+			job.setReducerClass(WordCountReducer.class);
+			//设置合成器,做map端预聚合
+			job.setCombinerClass(WordCountCombiner.class);
+
+			//设置输出的kv类型
+			job.setOutputKeyClass(Text.class);
+			job.setOutputValueClass(IntWritable.class);
+
+			//设置reduce个数
+			job.setNumReduceTasks(2);
+
+			//开始作业
+			job.waitForCompletion(true) ;
+		}
+	}
+
+
+
+InputFormat(默认情况下是TextInputFormat,序列文件一定可切割，序列文件不用指定KV类型)
+------------------
+	1.SequenceFileInputFormat
+		...
+		job.setInputFormatClass(SequenceFileInputFormat.class);
+		public static void main(String[] args) throws Exception {
+			args = new String[]{"file:///d:/mr/temp.seq", "file:///d:/mr/out"};
+			if (args == null || args.length < 2) {
+				throw new Exception("参数不足,需要两个参数!");
+			}
+
+			Configuration conf = new Configuration();
+			conf.set("fs.defaultFS", "file:///");
+			FileSystem fs = FileSystem.get(conf);
+
+			fs.delete(new Path(args[1]), true);
+
+			Job job = Job.getInstance(conf);
+			job.setJobName("maxTempApp");
+			job.setJarByClass(App.class);
+
+			job.setInputFormatClass(SequenceFileInputFormat.class);
+			job.setOutputFormatClass(TextOutputFormat.class);
+
+			FileInputFormat.addInputPath(job, new Path(args[0]));
+			FileOutputFormat.setOutputPath(job, new Path(args[1]));
+
+			job.setMapperClass(TempMapper.class);
+			job.setReducerClass(TempReducer.class);
+
+			//设置输出的kv类型，map输出和reduce输出不同时加上
+			job.setMapOutputKeyClass(IntWritable.class);
+			job.setMapOutputValueClass(IntWritable.class);
+
+			//map输出和reduce输出相同
+			job.setOutputKeyClass(Text.class);
+			job.setOutputValueClass(IntWritable.class);
+
+			job.setNumReduceTasks(2);
+			job.waitForCompletion(true);
+		}
+
+	2.KeyValueTextInputFormat
+		line feed				//换行	\r
+		carriage-return		//回车	\n                      
+		//分隔符设置key
+		mapreduce.input.keyvaluelinerecordreader.key.value.separator
+
+		//
+		public static void main(String[] args) throws Exception {
+				args = new String[]{"file:///d:/mr/temp.dat", "file:///d:/mr/out"};
+				if (args == null || args.length < 2) {
+					throw new Exception("参数不足,需要两个参数!");
+				}
+
+				Configuration conf = new Configuration();
+				//		  mapreduce.input.keyvaluelinerecordreader.key.value.separator
+				//conf.set("mapreduce.input.keyvaluelinerecordreader.key.value.separator" , " ");
+				conf.set(KeyValueLineRecordReader.KEY_VALUE_SEPERATOR, " ");
+				conf.set("fs.defaultFS", "file:///");
+				FileSystem fs = FileSystem.get(conf);
+
+				fs.delete(new Path(args[1]), true);
+
+				Job job = Job.getInstance(conf);
+				job.setJobName("kvMaxTempApp");
+				job.setJarByClass(App.class);
+
+				job.setInputFormatClass(KeyValueTextInputFormat.class);
+				job.setOutputFormatClass(TextOutputFormat.class);
+
+				FileInputFormat.addInputPath(job, new Path(args[0]));
+				FileOutputFormat.setOutputPath(job, new Path(args[1]));
+
+				job.setMapperClass(KVTempMapper.class);
+				job.setReducerClass(KVTempReducer.class);
+
+				//设置输出的kv类型
+				job.setMapOutputKeyClass(IntWritable.class);
+				job.setMapOutputValueClass(IntWritable.class);
+
+				job.setOutputKeyClass(IntWritable.class);
+				job.setOutputValueClass(Text.class);
+
+				job.setNumReduceTasks(2);
+				job.waitForCompletion(true);
+			}
+
+	3.
+	4.
+
+
+
+
+
+ 线程池
+ ----------------
+	ThreadPool
+	池化模式。
+	Executors.newFixedThreadPool(); 固定线程池
+	(1<<29)-1
+	0.ctl
+		control控制数字。
+
+		|_|_|_|_|_|_|_|_| |_|_|_|_|_|_|_|_| |_|_|_|_|_|_|_|_| |_|_|_|_|_|_|_|_| 
+
+										   29
+		capacity	:  1 << 29 - 1	//000 1..1
+
+										   29
+		running		: -1 << 29		//111 0..0
+
+										   29
+		SHUTDOWN	:  0 << 29		//000 0..0
+
+										   29
+		STOP		:  1 << 29		//001 0..0
+
+										   29
+		TIDYING		:  2 << 29		//010 0..0
+
+										   29
+		TERMINATED	:  3 << 29		//011 0..0
+
+		//提取控制数字的状态,前三位是状态位
+		public static runStateOf(int c)  
+		{ 
+			return c & ~CAPACITY; 
+		}
+
+		//提取工作线程的数量
+		static int workerCountOf(int c)  { 
+			return c & CAPACITY; 
+		}
+
+		//rs: runstate , wc: workercount
+		static int ctlOf(int rs, int wc) { 
+			return rs | wc; 
+		}
+
+	CAS算法  : CompareAndSet,比synchronize技术高效。
+
+	1.Executors
+		创建线程池的工具类。
+		-536870912
+		1110 0000 0000 0000 0000 0000 0000 0000
+
+		1110 0000 0000 0000 0000 0000 0000 0010
+
+
+完全分布式模式下任务的运行划分考察
+------------------------------------
+	JMX
+	java管理服务。
+	调整虚拟机内存大小，调节过程中不用关闭虚拟机 vm-->客户机名称右键-->设置-->滑动滑块。
+
+	[DebugTool.java]
+	package com.it18zhang.hadoop.util;
+
+	import java.io.OutputStream;
+	import java.lang.management.ManagementFactory;
+	import java.net.InetAddress;
+	import java.net.Socket;
+
+	/**
+	 * Created by Administrator on 2018/1/9.
+	 */
+	public class DebugTool {
+
+		/**
+		 *  获得主机名信息
+		 */
+		public static String getHost(){
+			try {
+				return InetAddress.getLocalHost().getHostName() ;
+			} catch (Exception e) {
+				e.printStackTrace();
+			}
+			return null ;
+		}
+
+		/**
+		 * 获得java进程id
+		 */
+		public static String getPID(){
+			try {
+				//s101@22345
+				String name = ManagementFactory.getRuntimeMXBean().getName();
+				return name.split("@")[0] ;
+			} catch (Exception e) {
+				e.printStackTrace();
+			}
+			return null ;
+		}
+
+		/**
+		 * 获得当前线程
+		 */
+		public static String getTID(){
+			try {
+				return Thread.currentThread().getName();
+			} catch (Exception e) {
+				e.printStackTrace();
+			}
+			return null ;
+		}
+
+		/**
+		 * 获得对象
+		 */
+		public static String getOID(Object obj){
+			try {
+				return obj.getClass().getSimpleName() + "@" + obj.hashCode();
+			} catch (Exception e) {
+				e.printStackTrace();
+			}
+			return null ;
+		}
+
+		public static String getDebugInfo(Object obj){
+			String host =getHost();
+			String pid = getPID() ;
+			String tid = getTID();
+			String oid = getOID(obj) ;
+			return  host + "#" + pid + "#" + tid + "#" + oid;
+		}
+
+		/**
+		 * 通过sock发送消息给socket
+		 */
+		public static void sendInfo(String ip,int port , Object obj , String msg){
+			try {
+				String info = getDebugInfo(obj);
+				info = info + "#" + msg ;
+				Socket sock = new Socket(ip,port) ;
+				OutputStream out = sock.getOutputStream() ;
+				out.write(info.getBytes());
+				out.write("\r\n".getBytes());
+				out.flush();
+				out.close();
+			} catch (Exception e) {
+				e.printStackTrace();
+			}
+		}
+	}
+
+
+hadoop jar my-hadoop.jar com.it18zhang.hadoop.mr.App /user/centos/1.txt /user/centos/out
+
+s102#10340#main#WordCountMapper@1765900922#new Mapper()
+s102#10340#main#WordCountMapper@1765900922#Mapper.setup()
+s102#10340#main#WordCountMapper@1765900922#Mapper.cleanup()
+
+s102#10341#main#WordCountMapper@1765900922#new Mapper()
+s102#10341#main#WordCountMapper@1765900922#Mapper.setup()
+s102#10341#main#WordCountMapper@1765900922#Mapper.map() : hello world4
+s102#10341#main#WordCountMapper@1765900922#Mapper.cleanup()
+====>s102#10341#main#WordCountCombiner@438151297#new Combiner()
+
+
+s102#10357#main#WordCountMapper@1765900922#new Mapper()
+s102#10357#main#WordCountMapper@1765900922#Mapper.setup()
+s102#10357#main#WordCountMapper@1765900922#Mapper.cleanup()
+
+s102#10359#main#WordCountMapper@1765900922#new Mapper()
+s102#10359#main#WordCountMapper@1765900922#Mapper.setup()
+s102#10359#main#WordCountMapper@1765900922#Mapper.map() : hello world3
+s102#10359#main#WordCountMapper@1765900922#Mapper.cleanup()
+====>s102#10359#main#WordCountCombiner@1970073944#new Combiner()
+====>s102#10359#main#WordCountCombiner@293474277#new Combiner()
+
+s102#10384#main#WordCountMapper@1765900922#new Mapper()
+s102#10384#main#WordCountMapper@1765900922#Mapper.setup()
+s102#10384#main#WordCountMapper@1765900922#Mapper.map() : hello world1
+s102#10384#main#WordCountMapper@1765900922#Mapper.cleanup()
+====>s102#10384#main#WordCountCombiner@96039159#new Combiner()
+====>s102#10384#main#WordCountCombiner@1564892747#new Combiner()
+
+s102#10417#main#WordCountMapper@1765900922#new Mapper()
+s102#10417#main#WordCountMapper@1765900922#Mapper.setup()
+s102#10417#main#WordCountMapper@1765900922#Mapper.map() : hello world2
+s102#10417#main#WordCountMapper@1765900922#Mapper.cleanup()
+====>s102#10417#main#WordCountCombiner@96039159#new Combiner()
+
+
+s106#6810#main#WordCountReducer@177104018#new Reducer()
+s106#6810#main#WordCountReducer@177104018#Reducer.setup()
+s106#6810#main#WordCountReducer@177104018#Reducer.cleanup()
+
+s102#10744#main#WordCountReducer@997695567#new Reducer()
+s102#10744#main#WordCountReducer@997695567#Reducer.setup()
+s102#10744#main#WordCountReducer@997695567#Reducer.cleanup()

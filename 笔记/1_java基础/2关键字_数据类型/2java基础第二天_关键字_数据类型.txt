@@ -1,0 +1,56 @@
+关键字
+-----------------
+1.用于定义类，函数，变量修饰符的关键字
+ abstract		//抽象的
+ final			//最终的
+ static			//静态的
+ synchronized		//同步的
+2.定义类与类之间关系的关键字
+ extends		//扩展，继承
+ implements		//实现
+3.用于定义建立实例及引用实例，判断实例的关键字
+ super			//超类的，父类
+ instanceof		//是否是xxx的实例
+4.用于异常处理的关键字
+ throws 
+5.用于包的关键字
+ package		//包
+ import			//导入
+6.其他修饰符关键字
+ native			//本地的
+ strictfp		
+ transient		//暂时的，临时的
+ volatile		//cpu不进行优化处理
+
+规范
+----------------
+1.包名：xxxyyyzzz	    
+2.类名接口名：XxxYyyZzz
+3.变量名和函数名：xxxYyyZzz
+
+注释
+-----------------
+1.文档注释，格式：
+	/**
+	 *
+	 */
+8种基本数据类型
+-----------------
+1.byte		1
+2.short		2
+3.int		4
+4.long 		8
+5.float		4
+6.double	8
+7.boolean	1
+8.char		2
+
+引用类型
+-----------------
+1.class
+2.interface
+3.数组[]
+
+选择结构
+-----------------
+switch语句选择的类型只有四种：byte,short,int,char

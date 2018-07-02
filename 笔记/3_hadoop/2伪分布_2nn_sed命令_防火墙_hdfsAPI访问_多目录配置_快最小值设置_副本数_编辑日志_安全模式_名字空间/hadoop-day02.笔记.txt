@@ -1,0 +1,510 @@
+﻿hadoop
+------------
+	分布式计算引擎。
+	核心模块
+	1.common
+		
+	2.hdfs
+		分布式文件系统。存储
+
+	3.mapreduce
+		编程模型。计算
+		
+	4.yarn
+		资源调度框架。
+
+hadoop集群三种模式
+-------------------
+	1.local
+		本地模式
+
+	2.pseudo
+		伪分布
+		副本1. 所有节点都在一台机器上
+	3.full
+		完全分布
+		副本是3.
+
+hadoop进程
+------------
+	1.hdfs
+		1.1)namenode
+			NN,
+			存放的是目录。
+			SPOF			//single point of failure,单点故障.
+
+		1.2)datanode
+			DN
+			存储数据。
+
+		1.3)secondarynamenode
+			2NN
+			对名称节点的备份。
+	2.yarn
+		1.1)resourcemanager
+			RM
+			master 
+
+		1.2)nodemanager
+			NM
+			和datanode在一起。
+
+伪分布部署（不作为重点）
+-------------
+	1.停掉集群
+		$>stop-all.sh
+	2.创建伪分布配置目录
+		$>cp -r full pseudo 
+	3.修改配置文件
+		[hdfs-site.xml]
+		<?xml version="1.0" encoding="UTF-8"?>
+		<?xml-stylesheet type="text/xsl" href="configuration.xsl"?>
+		<configuration>
+				<property>
+						<name>dfs.replication</name>
+						<value>1</value>	// 副本数改为1
+				</property>
+		</configuration>
+
+		[slaves]
+		localhost
+
+	4.格式化文件系统
+		4.1)删除原来的临时目录和log
+		4.2)格式化
+			$>hadoop namenode -format
+		
+	5)查看webui
+		[namenode]
+		http://s101:50070/
+		[datanode]
+		http://s101:50075/
+		[2nn]
+		http://s101:50090/
+		[rm] 8088
+
+
+改造集群结构
+--------------
+	1.引入单独的2nn
+		1.1)克隆并处理克隆机,安装rsync
+			修改静态IP，hostname、重启网络服务...
+		1.2)s101 ssh-copyid到s105
+			//root
+			ssh-copy-id 192.168.231.105
+			//centos
+			ssh-copy-id 192.168.231.105
+		1.3)修改s101的/usr/local/bin/.hosts
+			s101
+			s102
+			s103
+			s104
+			s105
+
+		1.4)修改/etc/hosts文件
+			...
+			192.168.231.105 s105
+		
+		1.5)分发
+			$>su root
+			$>xsync.sh /etc/hosts
+		
+		1.6)修改/usr/local/bin/xsync.sh
+			#!/bin/bash
+			f=$1
+			filename=`basename $f`
+			dirname=`dirname $f`
+			cd -P $dirname
+			path=`pwd`
+			who=`whoami`
+			for host in `sed -n '2,$p' /usr/local/bin/.hosts` ;
+			do
+			  tput setaf 2
+			  echo ======== $host ========
+			  tput setaf 7
+
+			  rsync -lr $f $who@$host:$path
+			done
+
+		1.7)复制hadoop安装目录和环境变量文件到s105
+			[s101]
+			rsync /etc/profile roots@s105:/etc
+			rsync -lr /soft/hadoop* centos@s105:/soft
+		
+	2.修改hadoop的临时目录,多种模式并存(灵活切换)
+		2.1)配置hadoop的临时目录到~下
+			[core-site.xml]
+			<property>
+			  <name>hadoop.tmp.dir</name>
+			  <value>/home/centos/hadoop/full</value>
+			</property>
+		
+		2.2)修改105为辅助名称节点
+			[hdfs-site.xml]
+			<property>
+			  <name>dfs.namenode.secondary.http-address</name>
+			  <value>s105:50090</value>
+			</property>
+
+	
+	3.修改软连接
+		$>cd /soft/hadoop/etc
+		$>ln -sfT full hadoop
+
+	4.分发配置
+		xsync.sh /soft/hadoop/etc/full
+	
+	5.格式化
+		
+		
+
+sed命令（流编辑器，指令取决于后边的字母）
+-------------
+	//d:delete,不修改源文件,输出结果
+	sed '1d' 1.txt
+
+	//安静模式，不输出到屏幕
+	sed -n '1d' 1.txt
+
+	//修改源文件,-i
+	sed '1d' 1.txt			//第一行
+	sed '$d' 1.txt			//最后一行
+	sed '1,2d' 1.txt		//前两行
+	
+	//p:打印,使用-n控制安静模式，不要输出源文件
+	sed -n '1,2p' 1.txt		//前两行
+	sed -n '$p' 1.txt		//
+	sed -n '$p' 1.txt		//
+	sed -n '/main/p' 1.txt	//输出含有main的行
+
+	//a:append
+	sed -n '1ahow are you??' 1.txt			//在第一行后追加
+	sed -n '1,$ahow are you??' 1.txt		//在每行后追加
+	sed -n '1,$a\   how are you??' 1.txt	//在每行后追加,空格开头使用\，转义字符
+
+	//i:insert插入，在指定行之前插队
+	sed -n '1ihow are you??' 1.txt			//在第一行前插入
+
+
+	//c:cover,以行为单位
+	sed -n '1,2chow are you??' 1.txt			//把前两行整体替换成how are you??
+
+	//s:替换指定的字符串
+	sed 's/hello/how/g' 1.txt
+
+永久关闭防火墙
+---------------
+	//永久关闭
+	$>sudo chkconfig firewalld off
+	//开启
+	$>sudo chkconfig firewalld on
+
+
+防火墙的安装
+--------------------
+	1.安装iptables-services
+	yum install iptables-services
+
+	2.设置开机启动
+	systemctl enable iptables
+
+	3.systemctl [stop|start|restart] iptables
+	启动服务：systemctl start iptables 
+	关闭服务：systemctl stop iptables 
+	重启服务：systemctl restart iptables
+
+
+webui
+------------
+	http://namenode:50070
+	http://datanode:50075
+	http://2nn:50090
+	http://rm:8088
+
+
+集群管理命令
+-------------
+	[启动]
+	start-all.sh			//启动所有进程start-dfs.sh + start-yarn.sh
+	start-dfs.sh			//启动所有hdfs进程,NN ,DN , 2NN
+	start-yarn.sh			//启动所有yarn进程,RM,NM
+
+	hadoop-daemon.sh		//启动单个hdfs进程的脚本
+	hadoop-daemons.sh		//slaves + hadoop-daemon.sh （slaves存储的是数据节点主机名）
+
+	hadoop-daemon.sh start namenode
+	hadoop-daemons.sh start datanode
+	hadoop-daemon.sh start secondarynamenode
+
+	yarn-daemon.sh start resourcemanager
+	yarn-daemon.sh start nodemanager
+	yarn-daemons.sh start nodemanager
+
+
+	
+	[停止]
+	stop-all.sh				//启动所有进程stop-dfs.sh + stop-yarn.sh
+	stop-dfs.sh				//启动所有hdfs进程,NN ,DN , 2NN
+	stop-yarn.sh			//启动所有yarn进程,RM,NM
+	hadoop-daemon.sh		//启动单个hdfs进程的脚本
+	hadoop-daemons.sh		//slaves + hadoop-daemon.sh
+	hadoop-daemon.sh stop namenode
+	hadoop-daemon.sh stop datanode	// 去数据节点启动
+	hadoop-daemon.sh stop secondarynamenode
+
+	yarn-daemon.sh stop resourcemanager
+	yarn-daemon.sh stop nodemanager
+	yarn-daemons.sh stop nodemanager
+
+
+hdfs操纵命令
+---------------
+	$>hdfs								//查看帮助
+	$>hdfs dfs							//
+	$>hdfs dfs -mkdir -p /user/centos
+	$>hdfs dfs -put  1.txt .			//上传到家目录/user/centos
+	$>hdfs dfs -put  1.txt /user		//上传到指定目录/user
+	$>hdfs dfs -put  1.txt .
+	$>hdfs dfs -rmr	/					//递归删除
+	$>hdfs dfs -rm -r /					//递归删除
+	$>hdfs dfs -rm -r /					//递归删除
+	$>hdfs dfs -cat 1.txt
+	$>hdfs dfs -cat /user/centos/1.txt
+	$>hdfs dfs -lsr /					//递归查看所有目录
+
+	$>hdfs dfs -get /user/centos/hadoop-tar.gz
+
+
+
+
+hdfs的分块理论
+-----------------
+	文件切割进行存放。128M一块。
+	读取文件的时间是寻道时间100倍。
+	磁盘的速率是100M/s左右，因此
+	数据块是128m。
+
+	物理切割。
+
+
+hdfs API访问
+-----------------
+	1.创建模块，添加maven依赖
+		<?xml version="1.0" encoding="UTF-8"?>
+		<project xmlns="http://maven.apache.org/POM/4.0.0"
+				 xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+				 xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+			<modelVersion>4.0.0</modelVersion>
+
+			<groupId>com.it18zhang</groupId>
+			<artifactId>my-hadoop</artifactId>
+			<version>1.0-SNAPSHOT</version>
+			<dependencies>
+				<dependency>
+					<groupId>org.apache.hadoop</groupId>
+					<artifactId>hadoop-client</artifactId>
+					<version>2.7.3</version>
+				</dependency>
+				<dependency>
+					<groupId>junit</groupId>
+					<artifactId>junit</artifactId>
+					<version>4.11</version>
+				</dependency>
+			</dependencies>
+		</project>
+	2.创建单元测试
+		package com.it18zhang.hadoop.test;
+
+		import org.apache.hadoop.conf.Configuration;
+		import org.apache.hadoop.fs.FSDataOutputStream;
+		import org.apache.hadoop.fs.FileSystem;
+		import org.apache.hadoop.fs.Path;
+		import org.junit.Test;
+
+		import java.io.IOException;
+
+		/**
+		 *
+		 */
+		public class TestHDFS {
+
+			/**
+			 * 测试文件上传
+			 */
+			@Test
+			public void testPut() throws Exception {
+				//创建配置对象
+				Configuration conf = new Configuration();
+				//通过配置对象创建文件系统
+				FileSystem fs = FileSystem.get(conf) ;
+
+				Path p = new Path("hdfs://s101:8020/user/centos/2.txt") ;
+				FSDataOutputStream out = fs.create(p) ;
+				out.write("how are you???".getBytes());
+				out.flush();
+				out.close();
+			}
+		}
+
+	3.复制core-site.xml文件到resource目录
+		<?xml version="1.0"?>
+		<configuration>
+			<property>
+				<name>fs.defaultFS</name>
+				<value>hdfs://s101/</value>
+			</property>
+			<property>
+				<name>hadoop.tmp.dir</name>
+				<value>/home/centos/hadoop/full</value>
+			</property>
+		</configuration>
+	
+	4.修改hdfs的写权限
+		$>hdfs dfs -chmod +w /user/centos
+
+/home/centos
+/user/centos
+
+配置windows hosts文件
+-----------------------
+	[C:\Windows\System32\drivers\etc\hosts]
+	...
+	192.168.231.100 s100
+	192.168.231.101 s101
+	192.168.231.102 s102
+	192.168.231.103 s103
+	192.168.231.104 s104
+	192.168.231.105 s105
+	192.168.231.106 s106
+	192.168.231.107 s107
+	...
+
+
+配置log4j配置文件
+-------------------
+	1.复制D:\downloads\bigdata\hadoop-2.7.3\etc\hadoop\log4j.properties到resources下	// 运行之后就没有log4j红字显示
+
+
+使用IOUtils读取数据
+---------------------
+	/**
+	 * 测试文件上传
+	 */
+	@Test
+	public void testRead2() throws Exception {
+		Configuration conf = new Configuration();
+		FileSystem fs = FileSystem.get(conf) ;
+		Path p = new Path("hdfs://s101:8020/user/centos/2.txt") ;
+		FSDataInputStream in = fs.open(p) ;
+		ByteArrayOutputStream baos = new ByteArrayOutputStream();
+		IOUtils.copyBytes(in,baos ,1024);	// hadoop工具类
+		System.out.println(new String(baos.toByteArray()));
+	}
+
+clusterID不兼容的问题（多在格式化文件系统后出现）
+-----------------------
+	1.格式化文件系统之后，NN生成新的clusterid，如果DN有原来的clusterID，导致不兼容。
+		CID-f74bb72f-67c9-40a3-b683-8cdb43091646
+		CID-3efcd1b2-1af0-4457-985a-fe742e1a7ebf
+	2.查看NN的VERSION
+		/home/centos/hadoop/full/dfs/name/current/VERSION
+	3. 查看DN节点的VERSION
+		/home/centos/hadoop/full/dfs/data/current/VERSION
+	
+	4.查看2nn的VERSION
+		/home/centos/hadoop/full/dfs/namesecondary/current/VERSION
+
+	5.解决办法，删除所有节点临时目录和日志，重新格式化
+		xcall.sh "rm -rf /home/centos/hadoop/full/*" // 临时目录
+		xcall.sh "rm -rf /soft/hadoop/logs/*" // 删除日志
+	6.格式化文件系统
+		//仅仅对NN的临时目录进行初始化
+		$>hadoop namenode -format
+
+给NN和DN配置多个目录（防止单点故障）
+--------------------
+	1.NN多目录配置
+		保证可靠性，每个目录下的存放内容完全相同。
+		通常配置不同磁盘的目录。
+
+	2.DN配置多个目录
+		目的在扩容。每个目录下内容不同。
+	
+	3.配置过程
+		3.1)配置
+			[hdfs-site.xml]
+			<!-- NN的多目录配置 -->
+			<property>
+			  <name>dfs.namenode.name.dir</name>
+			  <value>file://${hadoop.tmp.dir}/dfs/name1,file://${hadoop.tmp.dir}/dfs/name2</value>
+			</property>
+			<!-- DN的多目录配置 -->
+			<property>
+			  <name>dfs.datanode.data.dir</name>
+			  <value>file://${hadoop.tmp.dir}/dfs/data1,file://${hadoop.tmp.dir}/dfs/data2</value>
+			</property>
+
+		3.2)分发
+		3.3)演示
+
+最小块设置
+-------------
+	0.默认块大小,128m
+		[hdfs-site.xml]
+		<property>
+		  <name>dfs.blocksize</name>
+		  <value>134217728</value>
+		</property>
+
+	1.块最小值限制
+		必须是512的倍数，512是校验和的校验单位(每512字节一校验)。（数据在hadoop之间传递时进行校验）
+		[hdfs-site.xml]
+		<property>
+		  <name>dfs.namenode.fs-limits.min-block-size</name>
+		  <value>512</value>
+		</property>
+
+	2.通过hdfs命令查看当前集群参数的配置值
+		hdfs getconf -namenodes // hdfs getconf 查看hdfs命令帮助 
+		hdfs getconf -confKey dfs.namenode.fs-limits.min-block-size
+
+NameNode元数据分析
+---------------------
+	1.文件类型
+		1.1)镜像文件
+			存放这个hdfs的系统目录树结构的静态数据。
+			使用oiv(offline image viewer,离线镜像查看器可以查看文件内容)
+				$>hdfs oiv -i ./full/dfs/name1/current/fsimage_0000000000000000023  -o ~/a.xml -p XML
+				// i,镜像文件 o,输出文件 p,处理器
+
+		1.2)编辑日志
+			存放动态数据，操纵hdfs的动作存放在edit编辑日志中。
+			通过hdfs oev -i ./full/dfs/name1/current/edits_0000000000000000017-0000000000000000023 -o ~/edit.xml -p XML
+			TXID，TX事务 edit_inprogress,正在操纵的编辑日志
+		
+		1.3)拷贝xml文件到idea
+			
+ 	2.NameNode启动时
+		加载最新版本镜像文件和编辑日志(编号大于镜像文件)，镜像文件进行一次滚动，封闭原来的inprogress文件，
+		产生新的inproress文件。
+		可以手动完成日志的滚动。
+		hdfs dfsadmin -rollEdits
+
+
+hdfs管理命令（hdfs dfsadmin）
+----------------
+	1.滚动编辑日志
+		hdfs dfsadmin -rollEdits
+		hdfs dfsadmin -help rollEdits 
+
+	2.保存名字空间,
+		//需要在安全模式下执行。
+		hdfs dfsadmin -saveNamespace // 名字空间就是镜像文件
+
+	3.安全模式
+		该模式下，集群不能写入。
+		hdfs dfsadmin -safemode enter			//进入
+		hdfs dfsadmin -safemode leave			//离开
+		hdfs dfsadmin -safemode get				//查看
+		hdfs dfsadmin -safemode wait;hdfs dfs -put ~/1.txt      //等待,阻塞，等待退出安全模式后继续执行。
+

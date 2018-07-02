@@ -1,0 +1,446 @@
+﻿ Linux
+--------------------
+	1.操作系统。
+		Server, 
+		稳定安全， 
+
+		windows			//miscrosoft,桌面操作系统
+		linux			//server ， 
+						//ubuntu
+						//centos
+						//redhat
+						//suse
+						//红旗
+
+		mac				//apple
+
+
+虚拟化
+-----------------
+	1.宿主机
+
+	2.虚拟机
+
+	3.客户机
+
+vmware
+----------------
+	虚拟机软件。
+
+	CentOS-7-x86_64-Min-1511-100
+
+
+[vmware控制]
+-------------------
+	ctrl + alt				//激活鼠标
+
+linux常用命令
+------------------
+	$>cd /					//change directory
+	$>ls 					//列出当前目录
+	$>ls /					//列出指定目录结构
+	$>ls -al /home				//列表方式列出目录,-a包括.开头，理解为windows的隐藏文件
+	$>ls -al .				//.: 当前目录 ..:上级目录
+	$>ls -alh .				//h:人性化可读
+
+	$>clear					//清屏
+	$>whoami				//提取当前用户名
+
+	查看帮助的方式
+	$>cmd -h
+	$>cmd --help
+	$>man cmd
+	$>info cmd
+
+	$>su root						//切换用户
+	$>pwd							//常看当前目录
+	$>cd ~							//回到home目录
+	$>ll							//ls -l 
+	$>touch 1.txt					//创建文件
+	$>cat 1.txt						//查看文件内容
+	$>echo hello world				//打印输出
+	$>echo hello world > 1.txt		//输出重定向
+	$>echo -n hello world > 1.txt	//输出重定向,-n:不换行
+
+	$>ip addr						//查看ip地址
+	$>mkdir a b c					//创建多个目录
+	$>mkdir -p a/b/c				//创建多层目录
+	$>rm -f -r a					//-f:强制 -r:递归
+	$>find .						//递归显式所有内容
+
+	$>cp 1.txt b/					//复制文件到指定目录下.
+	$>cp -r a b						//递归复制目录到指定目录下
+
+	$>mv b/a .						//移动a到当前目录下
+	$>head 1.txt					//显式文件前10行
+	$>head -2 1.txt					//显式文件前2行
+	$>tail -2 1.txt					//显式文件后2行
+	$>more 1.txt					//分屏显式文件内容
+	$>wc -m 1.txt					//统计文件字节数
+	$>wc -c 1.txt					//统计文件字符数
+	$>wc -l 1.txt					//统计文件行数
+
+	$>which vi						//查看是否存在指定的命令
+
+	$>su root						//切换用户
+
+	$>hostname						//查看主机名称
+
+	$>find . | grep tom				// | 管道符，grep是过滤.
+
+	$>ifconfig						//查看ip地址,需要安装net-tool软件包
+
+
+	$>sudo passwd					//修改root用户密码
+	$>passwd						//修改当前用户密码
+
+	$>sudo reboot					//重启client
+
+	$>uname -a						//查看操作系统内核,
+
+	$>file 1.txt					//查看文件类型
+
+	$>tar -cf my.tar 1.txt 2.txt			// 创建归档文件
+	$>tar -tvf my.tar				// 列出归档文件内容
+	$>tar -xf my.tar				// 解档文件
+
+	$>gzip 1.txt 2.txt				//原地压缩文件
+	$>gzip  -d 1.txt.gz				//原地解压缩文件
+	$>gunzip 1.txt.gz				//原地解压缩文件
+
+	$>sudo find / | grep centos | grep bash		//多次管道实现组合过滤
+
+	$>ps							//查看进程
+	$>ps -Af | grep crond			//查看进程，过滤指定字符串
+	$>ps -Af | cut -c 50-100		//截串显式
+	$>ps -Af | more					//分屏显式进程，按空格键翻页
+
+	$>sudo fdisk -l					//查看磁盘分区列表
+	$>sudo df						//查看磁盘可用情况
+
+	$>dirname /a/b/c/d				// /a/b/c
+	$>basename /a/b/c/d				//d
+	$>basename `dirname /a/b/c/d`	//``是强行命令执行
+
+	$>cd -P ddd						//进入ddd指向的物理目录
+	$>pwd -P						//显式当前的物理目录
+
+
+
+
+
+链接文件
+------------
+	1.硬链接
+		两个独立的文件，彼此之间保持同步。
+		占用双倍的磁盘空间。
+		可以单独删除某个文件。其他的不受影响.
+
+		$>ln 1.txt 1.txt.ln
+	
+	2.软连接
+		符号连接。
+		类似于windows快捷方式。
+		不占用磁盘空间，是引用。
+
+		$>ln -s 1.txt 1.txt.ln
+		$>rm 1.txt
+		$>ln -sfT 1.txt 1.txt.ln			//修改软连接
+
+sudo命令启用
+---------------
+	1.修改/etc/sudoers
+		root   ALL=(ALL)   ALL
+		centos   ALL=(ALL)   ALL
+	
+	2.退出即可。
+
+	3.在普通用户下，通过sudo方式执行root权限
+		sudo vi /etc/sudoers
+
+修改hostname
+---------------
+	1./etc/hostname
+
+	2.需要使用root权限运行vi命令
+		$>su root 
+		$>vi /etc/hostname
+		-- 按insert键，进入插入模式
+		输入100
+		-- 按esc键，退出插入模式
+
+		--输入:wq,保存退出
+
+	3.使用hostname验证是否修改成功
+
+[vi命令编辑器]
+	$>vi /etc/hostname
+	-- 按insert键，进入插入模式
+	输入100
+	-- 按esc键，退出插入模式
+	--输入:wq,保存退出
+	:wq!						//保存退出
+	:q!							//不保存退出
+
+
+linux目录结构
+------------------
+	[可执行文件所在目录]
+	/bin                      原始的命令
+	/sbin			原始的命令	
+	/usr/bin		分支的命令
+	/usr/sbin		分支的命令
+	/usr/local/bin		用户的命令
+	/usr/local/sbin		用户的命令
+
+	[库文件目录]
+	/lib
+	/lib64
+	/usr/lib
+	/usr/lib64
+	/usr/local/lib
+	/usr/local/lib64
+
+	/dev				//设备目录
+	/etc				//配置目录
+	/home				//home目录
+	/home/centos		//
+	/mnt				//挂载目录
+	/opt				//可选，可用于软件安装目录
+	/proc				//process,进程,查看cpu值信息之类的
+	/root				//家目录
+	/srv				//服务目录
+	/sys				//系统目录
+	/usr				//厂商目录
+	/tmp				//临时目录
+
+	
+linux类型
+-----------------
+	-				//文件
+	d				//目录
+	b				//block，块设备，固态盘，U盘
+	l				//link，软连接，类似于windows快捷方式
+
+linux权限
+-----------------
+	0.资源进行权限分配
+		文件
+
+	1.三个部分
+		User	: 资源的owner
+		Group	: 和owner位于同一goup的user
+		Other	: 剩余的用户
+
+	2.控制权限
+		read		:r
+		write		:w
+		execute		:x
+		-			:无权限
+ifconfig
+---------------
+
+ping
+
+
+挂载iso文件到虚拟机光驱
+-------------------------
+	1.通过vmware软件，挂载iso文件到光驱。
+	2.连接
+	3.创建/mnt/cdrom目录
+		$>sudo mkdir /mnt/cdrom
+	4.挂载光驱到/mnt/cdrom下
+		$>sudo mount /dev/sr1 /mnt/cdrom
+	5.进入挂载目录
+		$>cd /mnt/cdrom
+	
+使用yum本地安装软件
+------------------------
+	//安装nano
+	1.sudo yum localinstall xxxx.rpm
+	
+	//安装net-tools软件包
+	2.sudo yum localinstall xxxx.rpm
+	
+
+宿主机和客户机之间网络连通方式
+--------------------------------
+	1.桥接
+		client当成一台网络内的物理主机。
+		client和其局域网内的物理机可以连通。
+		直接通过物理网络适配器进行通信。
+
+	2.NAT
+		Net address transform, 
+		网络地址转换。
+		host和client之间通过VNet8 虚拟网卡连通,该网络始终是连通的。
+
+		host可以访问client，client可以访问host，client无法访问局域网内的其他主机。
+		client可以访问外网。
+		默认配置.
+		
+	3.Only Host
+		和NAT相似，在NAT的基础上，限制了client对外网的访问。
+		更加安全。
+		通过VN1连通。
+
+
+nano
+-----------------
+	1.类似于vi的编辑器软件
+
+	$>nano 1.txt
+		ctrl + o			//保存
+		ctrl + k			//剪切当前行
+		ctrl + u			//粘贴行
+		ctrl + x			//退出
+
+
+修改静态IP
+----------------
+	1.以root用户，修改/etc/sysconfig/network-scripts/ifcfg-eno16xxxx777
+		TYPE=Ethernet	
+		BOOTPROTO=none	
+		DEFROUTE=yes	
+		IPV4_FAILURE_FATAL=no			
+		IPV6INIT=no
+		IPV6_AUTOCONF=no
+		IPV6_DEFROUTE=no
+		IPV6_PEERDNS=no
+		IPV6_PEERROUTES=no
+		IPV6_FAILURE_FATAL=no
+		NAME=eno16777736
+		UUID=33f3ce5f-8b5c-41af-90ed-863736e09c29
+		DEVICE=eno16777736
+		ONBOOT=yes
+		IPADDR=192.168.231.200
+		PREFIX=24
+		GATEWAY=192.168.231.2
+		DNS=192.168.231.2
+
+	2.重启网络服务
+		$>sudo service network restart
+
+	3.修改/etc/resolv.conf
+		$>sudo nano /etc/resolv.conf
+		nameserver 192.168.231.2
+		
+	4.查看能否连通外网
+		ping www.baidu.com
+
+
+卸载
+-----------------
+	1.卸载块设备和挂载目录均可以。
+	2.卸载命令
+		$>sudo umount /dev/sr1			//卸载块设备
+		$>sudo umount /mnt/cdrom		//卸载挂载目录
+
+
+修改命令提示符，显式绝对路径
+-----------------------------
+	1.配置环境变量
+		$>sudo nano /etc/profile
+
+		...
+		#最后一行，添加
+		export PS1='[\u@\h `pwd`]\$'	//u,用户 h,主机
+
+	2.重新登录
+
+
+权限
+-----------------------------
+	0.修改权限
+		U(user)			G(group)			O(other)
+		chmod u-r a
+		chmod u+r a
+		chmod u=r a
+		chmod 777 a
+		chmod 666 a
+		chmod 755 a
+		chmod ug+r a
+		chmod ugo+r a
+		chmod a+rw a
+		chmod -w a			//删除write权，把所有的w都去掉，相当于a-w
+		chmod +x 1.sh			//增加执行权
+		chmod -R 777 a			//递归修改
+
+	0'.修改拥有者 
+		chown root:root a	//
+		chown -R root:root a	//递归修改拥有者
+
+	1.read
+		读。
+		chmod 
+		目录			//列出目录的内容
+		文件			//读取文件内容
+		
+
+	2.write
+		写
+		目录			//增加孩子，删除孩子。新建，删除。让不让删取决于目录
+		文件			//修改文件内容
+
+	3.x:execute
+		执行			
+		目录			//是否能进入目录中。
+		文件			//执行脚本
+
+	4.-:none
+		没有
+
+linux环境变量
+----------------
+	0.注意
+		linux环境变量区分大小写，使用$访问
+
+	$>echo $PATH			//查看path环境变量，
+	$>echo ${PATH}			//ok
+	$>echo "$PATH"			//ok
+	$>echo "${PATH}"		//ok
+	$>echo '${PATH}'		//no
+	$>export				//查看所有环境变量
+
+	1.配置环境变量文件
+		/etc/profile
+		
+
+linux下安装jdk
+-------------------
+	1.下载jdk的linux版
+		jdk-8u65-linux-x64.tar.gz
+
+	2.通过winscp复制文件到centos
+		/home/centos/downloads/xxx.tar.gz	// winscp,windows和linux间的文件传输软件
+
+	3.解压tar.gz文件到指定目录
+		
+	4.创建/soft目录
+		$>sudo mkdir /soft	// 一般下载软件放/soft文件夹下
+
+	5.修改/soft目录为centos用户
+		$>sudo chown centos:centos /soft
+	
+	6.tar开文件到/soft下
+		$>cd ~/downloads
+		$>tar -xzvf jdk..... -C /soft	// 不加-C /soft在当前文件夹下tar开 
+
+	7.验证jdk是否成功
+		$>/soft/jdk_xxx/bin/java -version
+
+	8.创建/soft/jdk1.8.0_65的软连接/soft/jdk
+		$>ln -s /soft/jdk1.8.0_65 /soft/jdk
+	
+	9.修改/etc/profile文件
+		$>sudo nano /etc/profile
+			...
+			#最后一行
+			export JAVA_HOME=/soft/jdk
+			export PATH=$PATH:$JAVA_HOME/bin	// “：”，分隔符
+	
+	10.让环境变量生效
+		$>source /etc/profile
+	
+	11.验证jdk
+		java -version

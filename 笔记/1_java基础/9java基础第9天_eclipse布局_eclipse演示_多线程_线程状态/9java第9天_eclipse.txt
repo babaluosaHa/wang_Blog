@@ -1,0 +1,69 @@
+﻿1.严格来讲，类也是对象
+2.wait(),notify(),notifyAll()只能写在同步代码块中
+
+线程安全性
+--------------
+	synchronized(Object){...}
+	public synchronized void xxx(){...} 以当前所在对象作为锁旗标
+	public static synchronized void xxx(){...} 以使用类作为锁旗标
+
+eclipse
+-------------------
+	1.透视图 perspective
+	2.视图   view
+	3.双击产生断点
+	4.debug as 调试
+	5.run as 运行
+	6.选择表达式--右键--watch
+	7.调试中run to line
+	8.格式化代码 ctrl+shift+f
+	9.ctrl,鼠标移动 查看实现
+	6.ctrl+1,查看红叉内容
+	7.Alt+↑↓键，移动代码块
+
+引用别人的jar包
+----------------------------
+项目名称---右键----文件夹----lib粘贴----修改jar包名称
+
+查看jar包内容
+----------------------------
+右键---build Path---add to build Path
+
+线程状态
+---------------------
+1.NEW
+	尚未运行
+2.RUNNABLE 
+	正在运行的状态
+3.BLOCKED
+	 等待监视器的锁定权
+4.WAITING
+	等待状态（无限等待）
+	一个线程在等待了另一个线程特定的操作、
+5.TIMED WAITING
+	限时等待
+	等待指定时间
+6.TERMINATED
+	线程退出 
+7.Sleep
+	休眠
+
+String字符集编码
+----------------------
+	1.java.lang.String
+	2.name=name+""+i;
+	  String str=100+"";
+	3.基本数据类型或存在继承关系的引用类型可以强转。
+	4.charAt(),toCharArray(),indexof(),endwith(),startwith(),split()，subString(int index)
+
+ 
+作业
+--------------------
+1.StringUtil.
+	substring(int beginIndex,int length);//构建工具类，实现此方法。
+2.找出自己名字的Unicode码
+3.取出整数的8进制表示形式
+4.使用韩语字符集实现编解码实现。
+5.字符串倒序排列
+
+		

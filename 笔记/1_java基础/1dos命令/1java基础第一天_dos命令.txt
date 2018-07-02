@@ -1,0 +1,26 @@
+﻿dos命令
+----------------------
+cmd		//命令行 command line,
+dir		//目录directory
+cd		//change directory
+\		//windows路径分隔符\\
+d:		//切换盘符
+d:>dir /?	//dir /? 查看帮助文档
+.		//当前目录
+..		//上级目录
+cls		//clear screen 清屏
+mkdir		//make dir,创建目录
+exit		//退出
+echo		//回音
+>		//重定向，覆盖操作
+>>		//重定向，追加操作
+type		//输出文件内容.type a.txt
+rmdir		//remove dir
+tree		//使用树形结构显示文件系统
+copy		//复制
+move		//移动，在当前目录下移动，就相当于重命名
+set		//环境变量
+path		//windows下不区分大小写，操作系统的搜索目录顺序
+ctrl+c		//中断cmd
+cd dow tab	//tab键,自动补全，shift tab 往回走
+地址栏中直接输入cmd进入命令行窗口
